@@ -9,14 +9,6 @@ from datetime import datetime
 
 load_dotenv() # Load environment variables from .env file
 
-# MONGO_URI = os.environ.get('MONGO_URI')
-
-# # MongoDB connection setup
-# client = MongoClient(MONGO_URI)
-# db = client['telegram_bot_db'] # The name of the database
-# users_collection = db['users'] # Collection to store user details
-# chat_collection = db['chat_history'] # Collection to store chat history
-
 class DB:
     def __init__(self, MONGO_URI: str = None, database_name: str = None, users_collection_name: str = None, chat_collection_name: str = None):
 
@@ -52,13 +44,3 @@ class DB:
                 "is_authenticated": True,
                 "joined_date": datetime.now()
             })
-
-    # Function to log chat history
-    def log_chat(self, user_id: str, telegram_handle: str, message: str, response: str):
-        self.chat_collection.insert_one({
-            "user_id": user_id,
-            "telegram_handle": telegram_handle,
-            "message": message,
-            "response": response,
-            "timestamp": datetime.now()
-        })
