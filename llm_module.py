@@ -21,6 +21,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
 
+
 MONGO_URI = os.environ.get('MONGO_URI')
 database_name = 'telegram_bot_db'
 chat_collection_name = 'chat_history'
@@ -76,13 +77,13 @@ class LLM:
             "the question. If you don't know the answer, say that you "
             "don't know. Keep the answer concise."
             "\n\n"
-            "{context}"
+            "Context: {context}"
         )
 
         self.prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", self.system_prompt),
-                #MessagesPlaceholder("chat_history"),
+                MessagesPlaceholder("chat_history"),
                 ("human", "{input}"),
             ]
         )
@@ -90,10 +91,9 @@ class LLM:
         self.history_aware_retriever = create_history_aware_retriever(self.llm, self.retriever, self.contextualize_q_prompt)
 
         self.question_answer_chain = create_stuff_documents_chain(self.llm, self.prompt)
-        #self.rag_chain = create_retrieval_chain(self.history_aware_retriever, self.question_answer_chain)
-        self.rag_chain = create_retrieval_chain(self.retriever, self.question_answer_chain)
+        self.rag_chain = create_retrieval_chain(self.history_aware_retriever, self.question_answer_chain)
 
-        
+
 
         self.conversational_rag_chain = RunnableWithMessageHistory(
             self.rag_chain,
@@ -106,6 +106,7 @@ class LLM:
             input_messages_key="input",
             history_messages_key="chat_history",
             output_messages_key="answer",
+
         )
 
     # Response to text message    
@@ -115,10 +116,9 @@ class LLM:
         config={
             "configurable": {"session_id": user_id}
         }
-        # return self.conversational_rag_chain.invoke({"input": message},
-        #                                             config=config)['answer']
 
-        return self.rag_chain.invoke({"input": message})['answer']
+        return self.conversational_rag_chain.invoke({"input": message},
+                                                     config=config)['answer']
 
 
     
@@ -126,13 +126,9 @@ class LLM:
     # Response to document attachment
     async def load_document(self, file_path: str):
 
-        # config={
-        #     "configurable": {"session_id": user_id}
-        # }
-
         loader = PyPDFLoader(file_path)
         docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=20)
         splits = text_splitter.split_documents(docs)
 
         # add documents to vectorstore
