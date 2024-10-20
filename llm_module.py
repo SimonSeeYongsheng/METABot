@@ -6,7 +6,7 @@ from dotenv import load_dotenv, dotenv_values
 load_dotenv() # Load environment variables from .env file
 
 from langchain_google_genai import ChatGoogleGenerativeAI, HarmBlockThreshold, HarmCategory
-# from langchain_openai import ChatOpenAI # (Can swap with Gemini AI)
+from langchain_openai import ChatOpenAI # (Can swap with Gemini AI)
 
 from langchain_community.document_loaders import PyPDFLoader
 
@@ -66,11 +66,11 @@ class LLM:
             self.database = database_module.DB()
             
         
-        self.llm = ChatGoogleGenerativeAI(model=self.model_name, 
-                                          safety_settings=self.safety_settings,
-                                          google_api_key=self.api_key)
+        # self.llm = ChatGoogleGenerativeAI(model=self.model_name, 
+        #                                   safety_settings=self.safety_settings,
+        #                                   google_api_key=self.api_key)
 
-        # self.llm = ChatOpenAI(model="gpt-4o-mini", api_key= os.environ.get('OPENAI_API_KEY'))
+        self.llm = ChatOpenAI(model="gpt-4o-mini", api_key= os.environ.get('OPENAI_API_KEY'))
 
         self.vector_store = Chroma(
                                 collection_name="global_doc_collection",
@@ -82,12 +82,65 @@ class LLM:
         # self.vector_store = InMemoryVectorStore(GoogleGenerativeAIEmbeddings(model=self.text_embedding))
         # self.vector_store = InMemoryVectorStore(embedding=OpenAIEmbeddings())
         self.retriever = self.vector_store.as_retriever(search_type="similarity_score_threshold",
-                                                        search_kwargs={'score_threshold': 0.8})
+                                                        search_kwargs={'score_threshold': 0.5})
+        
+        self.anaylse_prompt = (
+"""
+You are an AI tasked with analyzing the chat history between a user and an educational chatbot to provide detailed insights into the user's learning abilities. Specifically, your goal is to differentiate between surface-level learning (basic understanding and memorization) and higher-order learning (critical thinking, problem-solving, and application). You will also analyze key themes, topics, or concepts from the user's most recent interactions. The report should begin with the following format:
+
+"Here is a learning analytics report of {nusnet_id}, {name} as of {datetime}"
+
+Follow these guidelines to generate the rest of the report:
+
+1. **Assess Learning Depth:**
+   - **Surface-Level Learning**: Identify instances where the user demonstrates a basic, factual understanding of concepts, focusing on recall or memorization (e.g., asking for definitions, straightforward answers, or relying on rote learning).
+   - **Higher-Order Learning**: Identify moments where the user exhibits deeper learning, such as applying concepts to new problems, analyzing and synthesizing information, or demonstrating critical thinking (e.g., asking how, why, or what-if questions, connecting concepts, or exploring implications).
+
+2. **Analyze Key Themes, Topics, or Concepts:**
+   - Identify the key themes, topics, or concepts from the user’s most recent interactions with the chatbot. Look for recurring subjects (e.g., algorithms, programming, mathematics) or specific concepts (e.g., recursion, sorting algorithms, dynamic programming) that the user has focused on.
+   - Highlight which of these topics the user has engaged with deeply (indicating higher-order learning) versus those where they showed surface-level understanding or struggled.
+
+3. **Analyze User’s Problem-Solving Approach:**
+   - **Surface-Level Problem-Solving**: Look for cases where the user seeks direct answers or step-by-step instructions without attempting to think through the problem independently.
+   - **Higher-Order Problem-Solving**: Identify instances where the user demonstrates strategic thinking, tries to work through problems independently, or engages in self-directed exploration before seeking help.
+
+4. **Learning Behavior Insights:**
+   - **Surface-Level Behavior**: Highlight areas where the user shows reliance on repetition or lacks depth in responses (e.g., asking the same question multiple times without showing progress or simply restating provided information).
+   - **Higher-Order Behavior**: Highlight areas where the user engages with content more deeply, showing progress in understanding complex concepts, making connections between ideas, or seeking to explore a concept beyond what is taught (e.g., discussing applications, seeking extensions of knowledge).
+
+5. **Learning Engagement and Motivation:**
+   - **Surface-Level Engagement**: Identify if the user shows passive engagement, such as only interacting when prompted, or seeking only quick answers to finish a task.
+   - **Higher-Order Engagement**: Look for active engagement patterns, such as asking open-ended questions, initiating deep discussions, or showing enthusiasm for learning beyond task requirements.
+
+6. **Provide Recommendations for Learning Development:**
+   - **For Surface-Level Learners**: Suggest strategies to move beyond rote memorization, such as focusing on the "why" behind concepts, engaging in active problem-solving exercises, or exploring case studies to apply knowledge.
+   - **For Higher-Order Learners**: Recommend more challenging tasks, such as solving real-world problems, exploring interdisciplinary applications, or engaging in research-based learning to deepen critical thinking.
+
+7. **Summary of Learning Progress and Ability:**
+   - Provide a summary that identifies whether the user primarily exhibits surface-level learning, higher-order learning, or a mixture of both.
+   - Include the key themes, topics, or concepts the user has focused on in recent interactions, noting whether the user demonstrated surface-level or higher-order learning for each topic.
+   - Highlight any notable shifts in learning behavior over time, and suggest a pathway for encouraging the user to move towards deeper learning and critical thinking skills.
+"""
+        )
 
         self.system_prompt = (
+"""
+You are an AI tutor designed to teach users about knowledge content, concepts, and problem-solving strategies. Follow these strict rules when interacting with users:
 
-            "You are a highly knowledgeable and helpful AI assistant designed to provide accurate and detailed responses to user queries by utilizing both **Global Context** and **User Context** when available." 
-            " Your purpose is to offer expert guidance and answers that are relevant, comprehensive, and clear." 
+1. **For Conceptual or Knowledge-Based Questions:**
+   - Provide clear, detailed explanations to teach or clarify the user's query.
+   - Use examples or analogies when necessary to aid understanding.
+
+2. **For Problem-Solving or Direct Answer Requests:**
+   - **Do NOT provide direct answers or solutions** to problem-solving questions. Under no circumstances should you state which algorithm, method, or solution is the best or correct one.
+   - **Instead, only offer hints and guiding questions**. Your goal is to prompt the user to think through the problem themselves by considering key aspects.
+   - Use **ONLY** scaffolding phrases like: "Have you considered...", "What do you think about...", "Can you break the problem into smaller steps?", "What constraints could influence the choice of solution?", "What are the memory trade-offs you might want to consider?"
+   - Avoid naming specific algorithms or solutions. Focus solely on guiding the thought process.
+
+3. **Ensure that users engage in the problem-solving process** by encouraging them to reflect on their approach, rather than giving them any answers or solutions.
+
+Your role is to help users develop critical thinking and problem-solving skills by guiding their approach, not by providing them with the solutions.
+"""
         )
 
         # self.system_prompt = (
@@ -188,7 +241,7 @@ class LLM:
         # add documents to vectorstore
         await self.vector_store.aadd_documents(documents=splits, ids=uuids)
         self.retriever = self.vector_store.as_retriever(search_type="similarity_score_threshold",
-                                                         search_kwargs={'score_threshold': 0.8})
+                                                         search_kwargs={'score_threshold': 0.5})
         
     async def global_clear_documents(self):
         self.vector_store.reset_collection()
@@ -214,8 +267,7 @@ class LLM:
 
         # add documents to vectorstore
         await vector_store.aadd_documents(documents=splits, ids=uuids)
-        # self.retriever = self.vector_store.as_retriever(search_type="similarity_score_threshold",
-        #                                                 search_kwargs={'score_threshold': 0.8})
+
 
     async def clear_documents(self, nusnet_id: str):
 
