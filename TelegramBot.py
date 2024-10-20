@@ -29,21 +29,44 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
     telegram_handle = update.effective_user.username
 
-    if db.is_user_authenticated(user_id):
+    logging.info(f"Authenticating: {telegram_handle}")
+
+
+    if db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle ):
         await context.bot.send_message(chat_id=user_id, text="Welcome back!")
     else:
-        db.authenticate_user(user_id, telegram_handle)
-        await context.bot.send_message(chat_id=user_id, text="You have been authenticated successfully!")
+        await context.bot.send_message(chat_id=user_id, text="You have not been authenticated to use this Chatbot!")
+
+# Handler for /new command to start a new conversation
+async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = update.effective_chat.id
+    nusnet_id = db.get_nusnet_id(user_id=user_id)
+
+    db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
+    await context.bot.send_message(chat_id=user_id, text="A new conversation has started")
+
+# Handler for /clear_documents command to clear documents in vectorstores
+async def clear_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = update.effective_chat.id
+    nusnet_id = db.get_nusnet_id(user_id=user_id)
+
+    if db.is_admin(user_id=user_id):
+        await llm.global_clear_documents()
+    else:
+        await llm.clear_documents(nusnet_id=nusnet_id)
 
 
 # Handler for receiving messages and logging chat history
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
+    nusnet_id = db.get_nusnet_id(user_id=user_id)
     telegram_handle = update.effective_user.username
 
     # Check if user is authenticated
-    if not db.is_user_authenticated(user_id):
+    if not db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
 
         await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
         return
@@ -52,7 +75,11 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logging.info(f"Message received: {user_message}")
 
-    response = await llm.response_message(message=user_message, user_id=user_id)
+    most_recent_convo = db.get_recent_conversation(nusnet_id=nusnet_id)
+    conversation_id = most_recent_convo if most_recent_convo  else 1
+
+    response = await llm.response_message(message=user_message, nusnet_id=nusnet_id , conversation_id=conversation_id)
+    logging.info(f"Message sent: {response}")
     await context.bot.send_message(chat_id=user_id, text=response)
 
 
@@ -60,10 +87,11 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
+    nusnet_id = db.get_nusnet_id(user_id=user_id)
     telegram_handle = update.effective_user.username
 
     # Check if user is authenticated
-    if not db.is_user_authenticated(user_id):
+    if not db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
 
         await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
         return
@@ -82,11 +110,19 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file = await update.message.effective_attachment.get_file()
         file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
         logging.info(f"File downloaded: {file_path}")
-        await llm.load_document(file_path=file_path)
+
+        if db.is_admin(user_id=user_id):
+            await llm.global_load_document(file_path=file_path)
+        else:
+            await llm.load_document(file_path=file_path, nusnet_id=nusnet_id)
+
         await context.bot.send_message(chat_id=user_id, text=f"PDF downloaded: {file_name}")
 
         if caption:
-            response = await llm.response_message(message=caption, user_id=user_id)
+
+            most_recent_convo = db.get_recent_conversation(nusnet_id=nusnet_id)
+            conversation_id = most_recent_convo if most_recent_convo else 1
+            response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
             await context.bot.send_message(chat_id=user_id, text=response)
 
     else:
@@ -97,10 +133,14 @@ if __name__ == '__main__':
     application = ApplicationBuilder().token(TELE_BOT_TOKEN).build()
     
     start_handler = CommandHandler('start', start)
+    new_convo_handler = CommandHandler('new', new)
+    clear_document_handler = CommandHandler("clear_docs", clear_docs)
     message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), message)
     document_handler = MessageHandler(filters.ATTACHMENT & (~filters.COMMAND), document)
 
     application.add_handler(start_handler)
+    application.add_handler(new_convo_handler)
+    application.add_handler(clear_document_handler)
     application.add_handler(message_handler)
     application.add_handler(document_handler)
 
