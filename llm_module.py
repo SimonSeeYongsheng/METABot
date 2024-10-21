@@ -25,6 +25,7 @@ import database_module
 
 from langchain_chroma import Chroma
 from uuid import uuid4
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import format_document
 from langchain.chains.combine_documents.base import (
     DEFAULT_DOCUMENT_PROMPT,
@@ -32,6 +33,7 @@ from langchain.chains.combine_documents.base import (
 )
 
 import logging
+from datetime import datetime
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -84,13 +86,16 @@ class LLM:
         self.retriever = self.vector_store.as_retriever(search_type="similarity_score_threshold",
                                                         search_kwargs={'score_threshold': 0.5})
         
-        self.anaylse_prompt = (
+        self.anaylse_system_prompt = (
 """
 You are an AI tasked with analyzing the chat history between a user and an educational chatbot to provide detailed insights into the user's learning abilities. Specifically, your goal is to differentiate between surface-level learning (basic understanding and memorization) and higher-order learning (critical thinking, problem-solving, and application). You will also analyze key themes, topics, or concepts from the user's most recent interactions. The report should begin with the following format:
 
 "Here is a learning analytics report of {nusnet_id}, {name} as of {datetime}"
 
-Follow these guidelines to generate the rest of the report:
+**If no chat history is available for this user, respond with:**
+"There is no chat history available for {nusnet_id}, {name} as of {datetime}. Therefore, no learning analysis can be provided at this time."
+
+If chat history exists, follow these guidelines to generate the report:
 
 1. **Assess Learning Depth:**
    - **Surface-Level Learning**: Identify instances where the user demonstrates a basic, factual understanding of concepts, focusing on recall or memorization (e.g., asking for definitions, straightforward answers, or relying on rote learning).
@@ -126,6 +131,8 @@ Follow these guidelines to generate the rest of the report:
         self.system_prompt = (
 """
 You are an AI tutor designed to teach users about knowledge content, concepts, and problem-solving strategies. Follow these strict rules when interacting with users:
+
+**Note**: Ensure the entire reponse does not exceed 4096 characters.
 
 1. **For Conceptual or Knowledge-Based Questions:**
    - Provide clear, detailed explanations to teach or clarify the user's query.
@@ -169,8 +176,20 @@ Your role is to help users develop critical thinking and problem-solving skills 
                 ("human", "Global context: {context}\n\nUser Context: {user_context}\n\nPrompt: {input}"),
             ]
         )
+
+        self.anaylse_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.anaylse_system_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human", "Give me a learning analysis report of the user using the previous chat history.\
+                  **Note**: Ensure the entire response does not exceed 4096 characters.")
+            ]
+        )
+
         self.question_answer_chain = create_stuff_documents_chain(self.llm, self.prompt)
         self.rag_chain = create_retrieval_chain(self.retriever, self.question_answer_chain)
+
+        self.analyse_chain = self.anaylse_prompt | self.llm | StrOutputParser()
 
 
         self.conversational_rag_chain = RunnableWithMessageHistory(
@@ -199,6 +218,23 @@ Your role is to help users develop critical thinking and problem-solving skills 
             ],
 
         )
+
+    # Response to analysis request
+    async def analyse_message(self, nusnet_id : str):
+
+        messages = self.database.get_all_conversation(nusnet_id=nusnet_id)
+        print(messages)
+        name = self.database.get_name(nusnet_id=nusnet_id)
+
+        response = self.analyse_chain.invoke({"nusnet_id": nusnet_id, "name": name, 
+                                              "datetime": datetime.now(), "chat_history": messages})
+        
+        logging.info(f"Analysis report: {response}")
+        
+        return response
+
+
+
 
     # Response to text message    
     async def response_message(self, message: str, nusnet_id : str, conversation_id: str):

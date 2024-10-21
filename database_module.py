@@ -55,6 +55,14 @@ class DB:
         user = self.users_collection.find_one({"user_id": user_id})
         return user.get("nusnet_id")
     
+    def user_exist(self, nusnet_id: str):
+        user = self.users_collection.find_one({"nusnet_id": nusnet_id})
+        return True if user else False
+    
+    def get_name(self, nusnet_id: str):
+        user = self.users_collection.find_one({"nusnet_id": nusnet_id})
+        return user.get("name")
+    
     def is_admin(self, user_id: str):
         user = self.users_collection.find_one({"user_id": user_id})
         return user.get("is_admin")
@@ -82,6 +90,23 @@ class DB:
         
         # If no conversation is found, return None
         return None
+    
+    def get_all_conversation(self, nusnet_id: str):
+
+        messages = []
+        recent_convo_id = self.get_recent_conversation(nusnet_id=nusnet_id)
+
+        if recent_convo_id:
+
+            for convo_id in range(1, recent_convo_id + 1):
+                messages.extend(self.get_by_session_id(nusnet_id=nusnet_id, conversation_id=convo_id).messages)
+                
+        return messages
+    
+
+
+
+
     
     def start_new_conversation(self, message: str, nusnet_id: str):
 

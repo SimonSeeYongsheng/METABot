@@ -57,6 +57,24 @@ async def clear_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await llm.clear_documents(nusnet_id=nusnet_id)
 
+# Handler for /analyse command to clear documents in vectorstores
+async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = update.effective_chat.id
+    user_message = context.args[0].upper()
+
+
+    if db.is_admin(user_id=user_id) and db.user_exist(nusnet_id=user_message):
+
+        response = await llm.analyse_message(nusnet_id=user_message)
+
+        await context.bot.send_message(chat_id=user_id, text=response)
+    
+    else:
+
+        await context.bot.send_message(chat_id=user_id, text="User is unauthorised")
+
+
 
 # Handler for receiving messages and logging chat history
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -135,12 +153,14 @@ if __name__ == '__main__':
     start_handler = CommandHandler('start', start)
     new_convo_handler = CommandHandler('new', new)
     clear_document_handler = CommandHandler("clear_docs", clear_docs)
+    analyse_handler = CommandHandler("analyse", analyse)
     message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), message)
     document_handler = MessageHandler(filters.ATTACHMENT & (~filters.COMMAND), document)
 
     application.add_handler(start_handler)
     application.add_handler(new_convo_handler)
     application.add_handler(clear_document_handler)
+    application.add_handler(analyse_handler)
     application.add_handler(message_handler)
     application.add_handler(document_handler)
 
