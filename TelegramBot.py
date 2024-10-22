@@ -61,8 +61,9 @@ async def clear_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
-    user_message = context.args[0].upper()
 
+    
+    user_message = db.get_nusnet_id(user_id) if len(context.args) == 0 else context.args[0].upper()
 
     if db.is_admin(user_id=user_id) and db.user_exist(nusnet_id=user_message):
 

@@ -68,9 +68,9 @@ class LLM:
             self.database = database_module.DB()
             
         
-        # self.llm = ChatGoogleGenerativeAI(model=self.model_name, 
-        #                                   safety_settings=self.safety_settings,
-        #                                   google_api_key=self.api_key)
+        self.llm = ChatGoogleGenerativeAI(model=self.model_name, 
+                                          safety_settings=self.safety_settings,
+                                          google_api_key=self.api_key)
 
         self.llm = ChatOpenAI(model="gpt-4o-mini", api_key= os.environ.get('OPENAI_API_KEY'))
 
@@ -223,7 +223,6 @@ Your role is to help users develop critical thinking and problem-solving skills 
     async def analyse_message(self, nusnet_id : str):
 
         messages = self.database.get_all_conversation(nusnet_id=nusnet_id)
-        print(messages)
         name = self.database.get_name(nusnet_id=nusnet_id)
 
         response = self.analyse_chain.invoke({"nusnet_id": nusnet_id, "name": name, 
