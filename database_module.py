@@ -66,7 +66,14 @@ class DB:
     def is_admin(self, user_id: str):
         user = self.users_collection.find_one({"user_id": user_id})
         return user.get("is_admin")
-
+    
+    def get_lab_group(self, user_id: str):
+        user = self.users_collection.find_one({"user_id": user_id})
+        return user.get("lab_group")
+    
+    def get_lab_students(self, lab_group: str):
+        students = self.users_collection.find({"lab_group": lab_group, "is_admin": False})
+        return students
 
     def get_by_session_id(self, nusnet_id: str, conversation_id: str) -> MongoDBChatMessageHistory:
 

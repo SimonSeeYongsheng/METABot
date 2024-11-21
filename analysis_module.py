@@ -86,6 +86,6 @@ class Analyser:
     async def get_analysis(self, name : str, nusnet_id : str, messages):
 
         response = self.analyse_chain.invoke({"nusnet_id": nusnet_id, "name": name, 
-                                              "datetime": datetime.now(), "chat_history": messages})
+                                              "datetime": datetime.now().replace(microsecond=0), "chat_history": messages})
     
         return response
