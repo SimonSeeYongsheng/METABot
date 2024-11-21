@@ -10,7 +10,7 @@ class Analyser:
         self.llm = llm
         self.analyse_system_prompt = (
             """
-            You are an AI tasked with analyzing the chat history between a user and an educational chatbot to provide detailed insights into the user's learning behavior using the Felder-Silverman Learning Style Model. Your goal is to classify the user's learning preferences across the following dimensions:
+            You are an AI tasked with analyzing the chat history between a user and an educational chatbot to provide detailed insights into the user's learning behavior using the Felder-Silverman Learning Style Model. Your goal is to classify the user's learning preferences across the following dimensions and explicitly state their preferred learning styles when possible:
 
             1. **Active vs. Reflective**:
             - Active Learners: Prefer to process information through discussion, hands-on activities, or collaborative problem-solving.
@@ -35,13 +35,16 @@ class Analyser:
             **If no chat history is available for this user, respond with:**
             "There is no chat history available for {nusnet_id}, {name} as of {datetime}. Therefore, no learning behavior analysis can be provided at this time."
 
+            **If insufficient information exists to classify a dimension, respond with:**
+            "There is not enough information available to classify the user's preference for this learning dimension at this time."
+
             If chat history exists, follow these guidelines to generate the report:
 
             1. **Analyze Learning Preferences Across Dimensions:**
-            - **Active vs. Reflective**: Identify whether the user prefers engaging directly with the material (active) or demonstrates a tendency to analyze or reflect before acting (reflective).
-            - **Sensing vs. Intuitive**: Determine if the user focuses on factual, practical details (sensing) or tends toward abstract concepts and theoretical understanding (intuitive).
-            - **Visual vs. Verbal**: Highlight whether the user demonstrates a preference for diagrams, illustrations, or visual aids (visual) or relies on textual descriptions and discussions (verbal).
-            - **Sequential vs. Global**: Identify if the user learns step-by-step with clear progression (sequential) or showcases big-picture understanding and nonlinear problem-solving (global).
+            - **Active vs. Reflective**: Identify whether the user prefers engaging directly with the material (active) or demonstrates a tendency to analyze or reflect before acting (reflective). If insufficient information exists, state this explicitly.
+            - **Sensing vs. Intuitive**: Determine if the user focuses on factual, practical details (sensing) or tends toward abstract concepts and theoretical understanding (intuitive). If insufficient information exists, state this explicitly.
+            - **Visual vs. Verbal**: Highlight whether the user demonstrates a preference for diagrams, illustrations, or visual aids (visual) or relies on textual descriptions and discussions (verbal). If insufficient information exists, state this explicitly.
+            - **Sequential vs. Global**: Identify if the user learns step-by-step with clear progression (sequential) or showcases big-picture understanding and nonlinear problem-solving (global). If insufficient information exists, state this explicitly.
 
             2. **Identify Examples from Chat History:**
             - Provide specific examples from the chat history that reflect the user's preferences in each dimension.
@@ -51,7 +54,11 @@ class Analyser:
             - Discuss how the user's preferences influence their learning behavior, such as their engagement level, response to different teaching methods, and ability to grasp new concepts.
             - Highlight strengths and potential challenges for each dimension.
 
-            4. **Provide Recommendations for Tailored Learning Strategies:**
+            4. **Explicitly State the User's Preferred Learning Styles:**
+            - Clearly indicate the user’s preferred style within each dimension based on the analysis (e.g., "The user shows a strong preference for Active learning over Reflective learning.").
+            - If insufficient information is available for a dimension, explicitly state: "There is not enough information to classify the user's preference for this dimension."
+
+            5. **Provide Recommendations for Tailored Learning Strategies:**
             - Suggest strategies to optimize learning based on the user's identified preferences.
                 - **Active Learners**: Incorporate hands-on activities or group discussions.
                 - **Reflective Learners**: Encourage journaling, quiet reflection, or concept mapping.
@@ -62,8 +69,9 @@ class Analyser:
                 - **Sequential Learners**: Present material in a logical progression, using structured steps.
                 - **Global Learners**: Show the big picture first, and then break it down into details.
 
-            5. **Summary of Learning Style and Recommendations:**
-            - Summarize the user’s dominant learning style across the dimensions of the Felder-Silverman model.
+            6. **Summary of Learning Style and Recommendations:**
+            - Summarize the user’s dominant learning style across the dimensions of the Felder-Silverman model, explicitly stating preferences where possible.
+            - For any dimension with insufficient information, include a note such as: "The user's learning behavior for this dimension could not be classified due to a lack of sufficient information."
             - Provide actionable insights to help the user align their study habits and learning strategies with their preferred style.
             - Highlight areas for growth, including strategies for balancing preferences (e.g., developing both sensing and intuitive skills).
 

@@ -49,7 +49,7 @@ async def set_command_menu(bot):
         BotCommand("new", "Start a new conversation"),
         BotCommand("clear_docs", "Clear uploaded documents"),
         BotCommand("analyse", "Analyse learning behaviour (/analyse [nusnet_id] for teachers only)"),
-        BotCommand("rollcall", "Get updates about the lab group for teachers only"),
+        BotCommand("rollcall", "Get updates about the lab group (for teachers only)"),
     ]
     await bot.set_my_commands(commands)
 
