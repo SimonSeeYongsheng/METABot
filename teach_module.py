@@ -8,10 +8,10 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 
 class Teacher:
 
-    def __init__(self, llm, retriever, database):
+    def __init__(self, llm, database):
 
         self.llm = llm
-        self.retriever = retriever
+        # self.retriever = retriever
         self.database = database
         self.teaching_prompt = (
             """
@@ -64,15 +64,46 @@ class Teacher:
             [
                 ("system", self.teaching_prompt),
                 MessagesPlaceholder("chat_history"),
-                ("human", "Global context: {context}\n\nUser Context: {user_context}\n\nPrompt: {input}"),
+                ("human", "User Context: {context} \n\n Prompt: {input}"),
             ]
         )
 
         self.question_answer_chain = create_stuff_documents_chain(self.llm, self.prompt)
-        self.rag_chain = create_retrieval_chain(self.retriever, self.question_answer_chain)
+        # self.rag_chain = create_retrieval_chain(self.retriever, self.question_answer_chain)
 
-        self.conversational_rag_chain = RunnableWithMessageHistory(
-            self.rag_chain,
+        # self.conversational_rag_chain = RunnableWithMessageHistory(
+        #     self.question_answer_chain,
+        #     self.database.get_by_session_id,
+        #     input_messages_key="input",
+        #     history_messages_key="chat_history",
+        #     output_messages_key="answer",
+        #     history_factory_config=[
+        #         ConfigurableFieldSpec(
+        #             id="nusnet_id",
+        #             annotation=str,
+        #             name="User ID",
+        #             description="Unique identifier for the user.",
+        #             default="",
+        #             is_shared=True,
+        #         ),
+        #         ConfigurableFieldSpec(
+        #             id="conversation_id",
+        #             annotation=str,
+        #             name="Conversation ID",
+        #             description="Unique identifier for the conversation.",
+        #             default="",
+        #             is_shared=True,
+        #         ),
+        #     ],
+
+        # )
+
+    async def get_response(self, message: str, nusnet_id : str, conversation_id: str, retriever):
+
+        rag_chain = create_retrieval_chain(retriever, self.question_answer_chain)
+
+        conversational_rag_chain = RunnableWithMessageHistory(
+            rag_chain,
             self.database.get_by_session_id,
             input_messages_key="input",
             history_messages_key="chat_history",
@@ -98,13 +129,10 @@ class Teacher:
 
         )
 
-    async def get_response(self, message: str, nusnet_id : str, conversation_id: str, file_text):
-
         config={
             "configurable": {"nusnet_id": nusnet_id , "conversation_id": conversation_id}
         }
 
-        response = self.conversational_rag_chain.invoke({"input": message, "user_context": file_text},
-                                                     config=config)
+        response = conversational_rag_chain.invoke({"input": message}, config=config)
         
         return response['answer']

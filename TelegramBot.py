@@ -80,11 +80,16 @@ async def clear_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
     nusnet_id = db.get_nusnet_id(user_id=user_id)
+    telegram_handle = update.effective_user.username
 
-    if db.is_admin(user_id=user_id):
-        await llm.global_clear_documents()
-    else:
-        await llm.clear_documents(nusnet_id=nusnet_id)
+    # Check if user is authenticated
+    if not db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+
+        await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
+        return
+
+    await llm.clear_documents(nusnet_id=nusnet_id)
+    await context.bot.send_message(chat_id=user_id, text="Documents cleared!")
 
 # Handler for /analyse command to analyse learning behaviour
 async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -174,10 +179,7 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
         logging.info(f"File downloaded: {file_path}")
 
-        if db.is_admin(user_id=user_id):
-            await llm.global_load_document(file_path=file_path)
-        else:
-            await llm.load_document(file_path=file_path, nusnet_id=nusnet_id)
+        await llm.load_document(file_path=file_path, nusnet_id=nusnet_id)
 
         await context.bot.send_message(chat_id=user_id, text=f"PDF downloaded: {file_name}")
 

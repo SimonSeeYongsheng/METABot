@@ -80,19 +80,19 @@ class LLM:
 
         self.llm = ChatOpenAI(model="gpt-4o-mini", api_key= os.environ.get('OPENAI_API_KEY'))
 
-        self.vector_store = Chroma(
-                                collection_name="global_doc_collection",
-                                embedding_function=self.text_embedding,
-                                persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
-                            )
-        self.retriever = self.vector_store.as_retriever()
+        # self.vector_store = Chroma(
+        #                         collection_name="global_doc_collection",
+        #                         embedding_function=self.text_embedding,
+        #                         persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
+        #                     )
+        # self.retriever = self.vector_store.as_retriever()
         
         self.intent = intent_classifier.Intent_Classifier(self.llm)
         self.analyse = analysis_module.Analyser(self.llm)
         self.rollcall = rollcall_module.Rollcall(self.llm)
-        self.general = general_module.General(llm=self.llm, retriever=self.retriever, database=self.database)
-        self.teach = teach_module.Teacher(llm=self.llm, retriever=self.retriever, database=self.database)
-        self.guide = guidance_module.Guide(llm=self.llm, retriever=self.retriever, database=self.database)
+        self.general = general_module.General(llm=self.llm, database=self.database)
+        self.teach = teach_module.Teacher(llm=self.llm, database=self.database)
+        self.guide = guidance_module.Guide(llm=self.llm, database=self.database)
 
         
         # self.vector_store = InMemoryVectorStore(GoogleGenerativeAIEmbeddings(model=self.text_embedding))
@@ -140,48 +140,48 @@ class LLM:
         
         retriever = vector_store.as_retriever()
         
-        docs = retriever.invoke(message)
+        # docs = retriever.invoke(message)
 
-        file_text = DEFAULT_DOCUMENT_SEPARATOR.join([format_document(doc, DEFAULT_DOCUMENT_PROMPT) for doc in docs])
+        # file_text = DEFAULT_DOCUMENT_SEPARATOR.join([format_document(doc, DEFAULT_DOCUMENT_PROMPT) for doc in docs])
 
-        logging.info(f"User Context: {file_text}")
+        # logging.info(f"User Context: {file_text}")
 
 
         match intention:
 
             case "General":
-                response = await self.general.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, file_text=file_text)
-                logging.info(f"General")
+                response = await self.general.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
+                logging.info(f"General: {response}")
 
             case "Teaching":
-                response = await self.teach.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, file_text=file_text)
-                logging.info(f"Teaching")
+                response = await self.teach.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
+                logging.info(f"Teaching: {response}")
 
             case "Guidance":
-                response = await self.guide.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, file_text=file_text)
-                logging.info(f"Guidance")
+                response = await self.guide.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
+                logging.info(f"Guidance: {response}")
 
 
         return response
     
-    # Response to document attachment
-    async def global_load_document(self, file_path: str):
+    # # Response to document attachment
+    # async def global_load_document(self, file_path: str):
 
-        loader = PyPDFLoader(file_path)
-        docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        splits = text_splitter.split_documents(docs)
+    #     loader = PyPDFLoader(file_path)
+    #     docs = loader.load()
+    #     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    #     splits = text_splitter.split_documents(docs)
 
-        uuids = [str(uuid4()) for _ in range(len(splits))]
+    #     uuids = [str(uuid4()) for _ in range(len(splits))]
 
 
 
-        # add documents to vectorstore
-        await self.vector_store.aadd_documents(documents=splits, ids=uuids)
-        self.retriever = self.vector_store.as_retriever()
+    #     # add documents to vectorstore
+    #     await self.vector_store.aadd_documents(documents=splits, ids=uuids)
+    #     self.retriever = self.vector_store.as_retriever()
         
-    async def global_clear_documents(self):
-        self.vector_store.reset_collection()
+    # async def global_clear_documents(self):
+    #     self.vector_store.reset_collection()
 
 
     
