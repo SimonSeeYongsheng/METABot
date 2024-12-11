@@ -11,7 +11,7 @@ from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
 
 load_dotenv() # Load environment variables from .env file
 
-class DB:
+class Chat_DB:
     def __init__(self, MONGO_URI: str = None, database_name: str = None, users_collection_name: str = None, chat_collection_name: str = None):
 
         if MONGO_URI == None:

@@ -21,7 +21,8 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.runnables import ConfigurableFieldSpec
-import database_module
+import chat_database
+import docs_database
 
 from langchain_chroma import Chroma
 from uuid import uuid4
@@ -51,34 +52,28 @@ database_name = 'telegram_bot_db'
 chat_collection_name = 'chat_history'
 
 class LLM:
-    def __init__(self, model_name: str = None, safety_settings: dict = None, api_key: str = None, text_embedding: str = None, database = None):
+    def __init__(self, LLM = None, Chat_Database = None, Docs_Database = None):
 
-        if model_name == None:
-            self.model_name = "gemini-1.5-flash"
 
-        if safety_settings == None:
-            self.safety_settings = {
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE
-                }
-            
-        if api_key == None:
-            self.api_key = os.environ.get('GOOGLE_API_KEY')
+        if LLM == None:
+            self.llm = ChatOpenAI(model="gpt-4o-mini", api_key= os.environ.get('OPENAI_API_KEY'))
+        else:
+            self.llm = LLM
 
-        if text_embedding == None:
-            self.text_embedding = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+        if Chat_Database == None:
+            self.chat_database = chat_database.Chat_DB()
+        else:
+            self.chat_database = Chat_Database
 
-        if database == None:
-            self.database = database_module.DB()
-            
-        
+        if Docs_Database == None:
+            self.docs_database = docs_database.Docs_DB()
+        else:
+            self.docs_database = Docs_Database
+
+
         # self.llm = ChatGoogleGenerativeAI(model=self.model_name, 
         #                                   safety_settings=self.safety_settings,
         #                                   google_api_key=self.api_key)
-
-        self.llm = ChatOpenAI(model="gpt-4o-mini", api_key= os.environ.get('OPENAI_API_KEY'))
 
         # self.vector_store = Chroma(
         #                         collection_name="global_doc_collection",
@@ -90,9 +85,9 @@ class LLM:
         self.intent = intent_classifier.Intent_Classifier(self.llm)
         self.analyse = analysis_module.Analyser(self.llm)
         self.rollcall = rollcall_module.Rollcall(self.llm)
-        self.general = general_module.General(llm=self.llm, database=self.database)
-        self.teach = teach_module.Teacher(llm=self.llm, database=self.database)
-        self.guide = guidance_module.Guide(llm=self.llm, database=self.database)
+        self.general = general_module.General(llm=self.llm, database=self.chat_database)
+        self.teach = teach_module.Teacher(llm=self.llm, database=self.chat_database)
+        self.guide = guidance_module.Guide(llm=self.llm, database=self.chat_database)
 
         
         # self.vector_store = InMemoryVectorStore(GoogleGenerativeAIEmbeddings(model=self.text_embedding))
@@ -101,8 +96,8 @@ class LLM:
     # Response to analysis request
     async def analyse_message(self, nusnet_id : str):
 
-        messages = self.database.get_all_conversation(nusnet_id=nusnet_id)
-        name = self.database.get_name(nusnet_id=nusnet_id)
+        messages = self.chat_database.get_all_conversation(nusnet_id=nusnet_id)
+        name = self.chat_database.get_name(nusnet_id=nusnet_id)
 
         response = await self.analyse.get_analysis(name=name, nusnet_id=nusnet_id, messages=messages)
         
@@ -113,8 +108,8 @@ class LLM:
     # Response to rollcall request
     async def rollcall_message(self, nusnet_id : str):
 
-        messages = self.database.get_all_conversation(nusnet_id=nusnet_id)
-        name = self.database.get_name(nusnet_id=nusnet_id)
+        messages = self.chat_database.get_all_conversation(nusnet_id=nusnet_id)
+        name = self.chat_database.get_name(nusnet_id=nusnet_id)
 
         response = await self.rollcall.get_rollcall(name=name, nusnet_id=nusnet_id, messages=messages)
         
@@ -132,13 +127,13 @@ class LLM:
 
         logging.info(f"Intent report: {intention}")
 
-        vector_store = Chroma(
-                                collection_name=nusnet_id,
-                                embedding_function=self.text_embedding,
-                                persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
-                            )
+        # vector_store = Chroma(
+        #                         collection_name=nusnet_id,
+        #                         embedding_function=self.text_embedding,
+        #                         persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
+        #                     )
         
-        retriever = vector_store.as_retriever()
+        retriever = await self.docs_database.as_retriever(nusnet_id=nusnet_id)
         
         # docs = retriever.invoke(message)
 
@@ -189,29 +184,41 @@ class LLM:
     # Response to document attachment
     async def load_document(self, file_path: str, nusnet_id: str):
 
-        loader = PyPDFLoader(file_path)
-        docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
-        splits = text_splitter.split_documents(docs)
+        await self.docs_database.load_document(file_path=file_path, nusnet_id=nusnet_id)
 
-        uuids = [str(uuid4()) for _ in range(len(splits))]
+        # loader = PyPDFLoader(file_path)
+        # docs = loader.load()
+        # text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+        # splits = text_splitter.split_documents(docs)
 
-        vector_store = Chroma(
-                                collection_name=nusnet_id,
-                                embedding_function=self.text_embedding,
-                                persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
-                            )
+        # logging.info(f"Loading docs...")
 
-        # add documents to vectorstore
-        await vector_store.aadd_documents(documents=splits, ids=uuids)
+        # uuids = [str(uuid4()) for _ in range(len(splits))]
+
+        # vector_store = Chroma(
+        #                         collection_name=nusnet_id,
+        #                         embedding_function=self.text_embedding,
+        #                         persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
+        #                     )
+
+        # # add documents to vectorstore
+        # lst_docs = await vector_store.aadd_documents(documents=splits, ids=uuids)
+
+        # logging.info(f"Added docs: {lst_docs}")
+
+
 
 
     async def clear_documents(self, nusnet_id: str):
 
-        vector_store = Chroma(
-                                collection_name=nusnet_id,
-                                embedding_function=self.text_embedding,
-                                persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
-                            )
+        await self.docs_database.clear_document(nusnet_id=nusnet_id)
+
+        # vector_store = Chroma(
+        #                         collection_name=nusnet_id,
+        #                         embedding_function=self.text_embedding,
+        #                         persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
+        #                     )
         
-        vector_store.reset_collection()
+        # vector_store.reset_collection()
+
+        # logging.info(f"Cleared docs for {nusnet_id}")

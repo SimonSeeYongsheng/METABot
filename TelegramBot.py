@@ -11,7 +11,7 @@ from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHan
 
 import llm_module # module for the LLM
 
-import database_module # module for the database
+import chat_database # module for the database
 
 load_dotenv() # Load environment variables from .env file
 
@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 
 llm = llm_module.LLM()
-db = database_module.DB()
+db = chat_database.Chat_DB()
 
 
 start_message = (
