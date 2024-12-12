@@ -110,11 +110,6 @@ class Chat_DB:
                 
         return messages
     
-
-
-
-
-    
     def start_new_conversation(self, message: str, nusnet_id: str):
 
         conversation_id = self.get_recent_conversation(nusnet_id)
@@ -128,6 +123,9 @@ class Chat_DB:
                 )
 
         chat_session_history.add_ai_message(message=message)
+
+    def get_all_nusnet_ids(self):
+        return self.users_collection.distinct("nusnet_id")
 
         
 

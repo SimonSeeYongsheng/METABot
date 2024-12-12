@@ -5,13 +5,19 @@ from dotenv import load_dotenv, dotenv_values
 import asyncio
 import nest_asyncio
 nest_asyncio.apply()
+
+import schedule
+import time
+import threading
+
 import logging
 from telegram import Update, BotCommand
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes
 
 import llm_module # module for the LLM
 
-import chat_database # module for the database
+import chat_database # module for the chat database
+import docs_database # module for the doc database
 
 load_dotenv() # Load environment variables from .env file
 
@@ -23,8 +29,12 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-llm = llm_module.LLM()
-db = chat_database.Chat_DB()
+chat_db = chat_database.Chat_DB()
+doc_db = docs_database.Docs_DB(Chat_Database=chat_db)
+llm = llm_module.LLM(Chat_Database=chat_db, Docs_Database=doc_db)
+
+scheduled_clear_time = "04:00"
+
 
 
 start_message = (
@@ -34,9 +44,9 @@ start_message = (
     "🆕 */new*: Start a new conversation.\n"
     "🗑️ */clear_docs*: Clear any uploaded documents.\n"
     "📊 */analyse*: For students, this analyses your learning behaviour and provides personalized insights.\n"
-    "🧑‍🏫 */analyse [nusnet_id]* to view your student’s learning behaviour (for teachers only).\n"
-    "📝 */rollcall*: Get updates about the lab group (for teachers only).\n\n"
-    "You can upload your learning materials (PDF format only), then start chatting to:\n"
+    "🧑‍🏫 */analyse [nusnet_id]* to view your student’s learning behaviour *(for teachers only)*.\n"
+    "📝 */rollcall*: Get updates about the lab group *(for teachers only)*.\n\n"
+    "You can upload your learning materials *(PDF format only)*, then start chatting to:\n"
     "📚 *Teach content*: Dive into the material and learn interactively.\n"
     "💡 *Ask for guidance*: Get help understanding concepts or solving problems.\n\n"
     "I’m here to assist you in your learning journey! 😊"
@@ -61,8 +71,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info(f"Authenticating: {telegram_handle}")
 
 
-    if db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle ):
-        await context.bot.send_message(chat_id=user_id, text=start_message)
+    if chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle ):
+
+        #await context.bot.send_message(chat_id=user_id, text="Absolutely\\!", parse_mode="MarkdownV2")
+        await context.bot.send_message(chat_id=user_id, text=start_message, parse_mode="Markdown")
     else:
         await context.bot.send_message(chat_id=user_id, text="You have not been authenticated to use this Chatbot!")
 
@@ -70,25 +82,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
-    nusnet_id = db.get_nusnet_id(user_id=user_id)
+    nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
 
-    db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
+    chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
     await context.bot.send_message(chat_id=user_id, text="A new conversation has started")
 
 # Handler for /clear_documents command to clear documents in vectorstores
 async def clear_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
-    nusnet_id = db.get_nusnet_id(user_id=user_id)
+    nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
     telegram_handle = update.effective_user.username
 
     # Check if user is authenticated
-    if not db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+    if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
 
         await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
         return
 
-    await llm.clear_documents(nusnet_id=nusnet_id)
+    llm.clear_documents(nusnet_id=nusnet_id)
     await context.bot.send_message(chat_id=user_id, text="Documents cleared!")
 
 # Handler for /analyse command to analyse learning behaviour
@@ -96,11 +108,11 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
 
-    user_nusnet_id = db.get_nusnet_id(user_id)
+    user_nusnet_id = chat_db.get_nusnet_id(user_id)
 
     user_message = user_nusnet_id if len(context.args) == 0 else context.args[0].upper()
 
-    if db.is_admin(user_id=user_id) and db.user_exist(nusnet_id=user_message):
+    if chat_db.is_admin(user_id=user_id) and chat_db.user_exist(nusnet_id=user_message):
 
         logging.info(f"Analysing: {user_message}")
 
@@ -110,7 +122,7 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(chat_id=user_id, text=response)
 
-    elif user_nusnet_id == user_message and db.user_exist(nusnet_id=user_message):
+    elif user_nusnet_id == user_message and chat_db.user_exist(nusnet_id=user_message):
 
         logging.info(f"Analysing: {user_message}")
 
@@ -130,11 +142,11 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
-    nusnet_id = db.get_nusnet_id(user_id=user_id)
+    nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
     telegram_handle = update.effective_user.username
 
     # Check if user is authenticated
-    if not db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+    if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
 
         await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
         return
@@ -143,7 +155,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logging.info(f"Message received: {user_message}")
 
-    most_recent_convo = db.get_recent_conversation(nusnet_id=nusnet_id)
+    most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
     conversation_id = most_recent_convo if most_recent_convo  else 1
 
     response = await llm.response_message(message=user_message, nusnet_id=nusnet_id , conversation_id=conversation_id)
@@ -155,11 +167,11 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
-    nusnet_id = db.get_nusnet_id(user_id=user_id)
+    nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
     telegram_handle = update.effective_user.username
 
     # Check if user is authenticated
-    if not db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+    if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
 
         await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
         return
@@ -185,7 +197,7 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if caption:
 
-            most_recent_convo = db.get_recent_conversation(nusnet_id=nusnet_id)
+            most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
             conversation_id = most_recent_convo if most_recent_convo else 1
             response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
             await context.bot.send_message(chat_id=user_id, text=response)
@@ -198,10 +210,10 @@ async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
 
-    if db.is_admin(user_id=user_id):
+    if chat_db.is_admin(user_id=user_id):
 
-        lab_group = db.get_lab_group(user_id=user_id)
-        students = db.get_lab_students(lab_group=lab_group)
+        lab_group = chat_db.get_lab_group(user_id=user_id)
+        students = chat_db.get_lab_students(lab_group=lab_group)
 
         logging.info(f"Rollcall: {lab_group}")
 
@@ -219,6 +231,19 @@ async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(chat_id=user_id, text="User is unauthorised")
 
+def clear_all_docs():
+
+    logging.info(f"Scheduled documents clearance")
+    doc_db.clear_all_docs()
+
+
+def run_scheduler():
+    # Schedule the async task
+    schedule.every().day.at(scheduled_clear_time).do(clear_all_docs)
+    print("Scheduler started. Waiting for tasks to execute...")
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 
 
@@ -227,6 +252,12 @@ async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def main():
+
+    # Start the scheduler in a separate thread
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+
+    # Build the bot application
     application = ApplicationBuilder().token(TELE_BOT_TOKEN).build()
     
     start_handler = CommandHandler('start', start)

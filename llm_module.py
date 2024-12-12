@@ -66,7 +66,7 @@ class LLM:
             self.chat_database = Chat_Database
 
         if Docs_Database == None:
-            self.docs_database = docs_database.Docs_DB()
+            self.docs_database = docs_database.Docs_DB(Chat_Database=self.chat_database)
         else:
             self.docs_database = Docs_Database
 
@@ -208,10 +208,13 @@ class LLM:
 
 
 
+    def clear_documents(self, nusnet_id: str):
 
-    async def clear_documents(self, nusnet_id: str):
+        self.docs_database.clear_documents(nusnet_id=nusnet_id)
 
-        await self.docs_database.clear_document(nusnet_id=nusnet_id)
+    # async def clear_documents(self, nusnet_id: str):
+
+    #     await self.docs_database.clear_documents(nusnet_id=nusnet_id)
 
         # vector_store = Chroma(
         #                         collection_name=nusnet_id,

@@ -1,5 +1,6 @@
 # importing os module for environment variables
 import os
+import shutil
 # importing necessary functions from dotenv library
 from dotenv import load_dotenv, dotenv_values 
 
@@ -21,7 +22,7 @@ logging.basicConfig(
 
 class Docs_DB:
 
-    def __init__(self, text_embedding = None, text_splitter = None):
+    def __init__(self, text_embedding = None, text_splitter = None, Chat_Database = None):
 
         if text_embedding == None:
             self.text_embedding = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
@@ -33,12 +34,17 @@ class Docs_DB:
         else:
             self.text_splitter = text_splitter
 
+        if Chat_Database == None:
+            self.chat_database = chat_database.Chat_DB()
+        else:
+            self.chat_database = Chat_Database
+
     async def as_retriever(self, nusnet_id: str):
 
         vector_store = Chroma(
                                 collection_name=nusnet_id,
                                 embedding_function=self.text_embedding,
-                                persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
+                                persist_directory=f"./chroma_langchain_db/{nusnet_id}",  # Where to save data locally, remove if not necessary
                             )
         
         retriever = vector_store.as_retriever()
@@ -57,7 +63,7 @@ class Docs_DB:
         vector_store = Chroma(
                                 collection_name=nusnet_id,
                                 embedding_function=self.text_embedding,
-                                persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
+                                persist_directory=f"./chroma_langchain_db/{nusnet_id}",  # Where to save data locally, remove if not necessary
                             )
 
         # add documents to vectorstore
@@ -65,16 +71,35 @@ class Docs_DB:
 
         logging.info(f"Added docs: {lst_docs}")
 
+        os.remove(file_path)
 
-    async def clear_documents(self, nusnet_id: str):
+        logging.info(f"Removed file")
+
+
+    def clear_documents(self, nusnet_id: str):
 
         vector_store = Chroma(
                                 collection_name=nusnet_id,
                                 embedding_function=self.text_embedding,
-                                persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
+                                persist_directory=f"./chroma_langchain_db/{nusnet_id}",  # Where to save data locally, remove if not necessary
                             )
         
-        vector_store.reset_collection()
+        vector_store.delete_collection()
+
+        shutil.rmtree(f"./chroma_langchain_db/{nusnet_id}", ignore_errors=True)
 
         logging.info(f"Cleared docs for {nusnet_id}")
+
+    def clear_all_docs(self):
+
+        list_nusnet_id = self.chat_database.get_all_nusnet_ids()
+
+        for nusnet_id in list_nusnet_id:
+
+            self.clear_documents(nusnet_id=nusnet_id)
+
+        
+
+
+
 
