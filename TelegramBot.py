@@ -14,6 +14,9 @@ import logging
 from telegram import Update, BotCommand
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
+
 import llm_module # module for the LLM
 
 import chat_database # module for the chat database
@@ -145,6 +148,14 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
     telegram_handle = update.effective_user.username
 
+    keyboard = [
+        [
+            InlineKeyboardButton("👎", callback_data='dislike'),
+        ]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     # Check if user is authenticated
     if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
 
@@ -160,7 +171,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     response = await llm.response_message(message=user_message, nusnet_id=nusnet_id , conversation_id=conversation_id)
     logging.info(f"Message sent: {response}")
-    await context.bot.send_message(chat_id=user_id, text=response)
+    await context.bot.send_message(chat_id=user_id, text=response, reply_markup=reply_markup)
 
 
 # Handler for receiving document and logging chat hist
@@ -169,6 +180,14 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
     nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
     telegram_handle = update.effective_user.username
+
+    keyboard = [
+        [
+            InlineKeyboardButton("👎", callback_data='dislike'),
+        ]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
     # Check if user is authenticated
     if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
@@ -200,7 +219,7 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
             conversation_id = most_recent_convo if most_recent_convo else 1
             response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
-            await context.bot.send_message(chat_id=user_id, text=response)
+            await context.bot.send_message(chat_id=user_id, text=response, reply_markup=reply_markup)
 
     else:
         await context.bot.send_message(chat_id=user_id, text="Unsupported file type received.")
@@ -230,6 +249,41 @@ async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
 
         await context.bot.send_message(chat_id=user_id, text="User is unauthorised")
+
+
+async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.message.chat.id  # Fetch user ID from the query
+    nusnet_id = chat_db.get_nusnet_id(user_id=user_id)  # Get user's NUSNET ID from the database
+   
+    # Acknowledge the callback query
+    await query.answer()
+
+    await context.bot.send_message(chat_id=user_id, text="We apologise for the error. The recent conversation will be forwarded to the TA for review. 🙏")
+
+    instructors = chat_db.get_instructors(user_id=user_id)
+    message_id = query.message.message_id
+
+    for instructor_user_id in instructors:
+
+        await context.bot.forward_message(
+            chat_id=instructor_user_id,
+            from_chat_id=user_id,
+            message_id=(message_id - 1)
+            )
+
+        await context.bot.forward_message(
+            chat_id=instructor_user_id,
+            from_chat_id=user_id,
+            message_id=message_id
+            )
+        
+    await context.bot.send_message(chat_id=user_id, text="We are saving the conversation for review and starting a new conversation... 📝")
+    recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+    chat_db.input_feedback(nusnet_id=nusnet_id, conversation_id=recent_convo,message=query.message.text)
+
+    chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
+    await context.bot.send_message(chat_id=user_id, text="A new conversation has started")
 
 def clear_all_docs():
 
@@ -267,7 +321,9 @@ async def main():
     rollcall_handler = CommandHandler("rollcall", rollcall)
     message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), message)
     document_handler = MessageHandler(filters.ATTACHMENT & (~filters.COMMAND), document)
+    reaction_handler = CallbackQueryHandler(handle_reactions)
 
+    application.add_handler(reaction_handler)
     application.add_handler(start_handler)
     application.add_handler(new_convo_handler)
     application.add_handler(clear_document_handler)
@@ -275,6 +331,7 @@ async def main():
     application.add_handler(rollcall_handler)
     application.add_handler(message_handler)
     application.add_handler(document_handler)
+    application.add_handler(reaction_handler)
 
     # Set menu commands
     await set_command_menu(application.bot)

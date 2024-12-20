@@ -12,7 +12,7 @@ from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
 load_dotenv() # Load environment variables from .env file
 
 class Chat_DB:
-    def __init__(self, MONGO_URI: str = None, database_name: str = None, users_collection_name: str = None, chat_collection_name: str = None):
+    def __init__(self, MONGO_URI: str = None, database_name: str = None, users_collection_name: str = None, chat_collection_name: str = None, feedback_collection_name: str = None):
 
         if MONGO_URI == None:
             self.MONGO_URI = os.environ.get('MONGO_URI')
@@ -22,6 +22,8 @@ class Chat_DB:
             self.users_collection_name = 'users'
         if chat_collection_name == None:
             self.chat_collection_name = 'chat_history'
+        if feedback_collection_name == None:
+            self.feedback_collection_name = 'llm_wrong_responses'
         
 
         # MongoDB connection setup
@@ -29,6 +31,7 @@ class Chat_DB:
         self.db = self.client[self.database_name] # The name of the database
         self.users_collection = self.db[self.users_collection_name] # Collection to store user details
         self.chat_collection = self.db[self.chat_collection_name] # Collection to store chat history
+        self.feedback_collection = self.db[self.feedback_collection_name] # Collection to store chat history
 
     # Helper function to check if a user is authenticated
     def is_user_authenticated(self, user_id: str,telegram_handle: str):
@@ -126,6 +129,28 @@ class Chat_DB:
 
     def get_all_nusnet_ids(self):
         return self.users_collection.distinct("nusnet_id")
+    
+    def input_feedback(self, nusnet_id: str, conversation_id: str, message: str):
+
+        self.feedback_collection.insert_one({
+            'nusnet_id' : nusnet_id,
+            'conversation_id': conversation_id,
+            'llm_wrong_response': message
+        })
+
+    def get_instructors(self, user_id: str):
+
+        # Get lab group of user
+        lab_group = self.get_lab_group(user_id=user_id)
+
+        # Query the users collection for instructors of the user
+        instructors = list(map(lambda x: x.get("user_id"), self.users_collection.find({ "lab_group": lab_group, "is_admin" :True}).to_list()))
+
+        return instructors
+
+
+
+
 
         
 
