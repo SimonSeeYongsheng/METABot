@@ -12,6 +12,7 @@ class General:
         self.llm = llm
         # self.retriever = retriever
         self.database = database
+
         self.general_chat_prompt = (
             """
             You are an all-purpose conversational AI assistant. Your primary goals are to:

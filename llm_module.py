@@ -86,7 +86,6 @@ class LLM:
         self.analyse = analysis_module.Analyser(self.llm)
         self.rollcall = rollcall_module.Rollcall(self.llm)
         self.general = general_module.General(llm=self.llm, database=self.chat_database)
-        self.teach = teach_module.Teacher(llm=self.llm, database=self.chat_database)
         self.guide = guidance_module.Guide(llm=self.llm, database=self.chat_database)
 
         
@@ -148,9 +147,9 @@ class LLM:
                 response = await self.general.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
                 logging.info(f"General: {response}")
 
-            case "Teaching":
-                response = await self.teach.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
-                logging.info(f"Teaching: {response}")
+            # case "Teaching":
+            #     response = await self.teach.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
+            #     logging.info(f"Teaching: {response}")
 
             case "Guidance":
                 response = await self.guide.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
@@ -182,10 +181,9 @@ class LLM:
     
 
     # Response to document attachment
-    async def load_document(self, file_path: str, nusnet_id: str):
+    async def load_document(self, file_path: str, nusnet_id: str, file_type: str):
 
-        await self.docs_database.load_document(file_path=file_path, nusnet_id=nusnet_id)
-
+        await self.docs_database.load_document(file_path=file_path, nusnet_id=nusnet_id, file_type=file_type)
         # loader = PyPDFLoader(file_path)
         # docs = loader.load()
         # text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)

@@ -49,7 +49,7 @@ start_message = (
     "📊 */analyse*: For students, this analyses your learning behaviour and provides personalized insights.\n"
     "🧑‍🏫 */analyse [nusnet_id]* to view your student’s learning behaviour *(for teachers only)*.\n"
     "📝 */rollcall*: Get updates about the lab group *(for teachers only)*.\n\n"
-    "You can upload your learning materials *(PDF format only)*, then start chatting to:\n"
+    "You can upload your learning materials, then start chatting to:\n"
     "📚 *Teach content*: Dive into the material and learn interactively.\n"
     "💡 *Ask for guidance*: Get help understanding concepts or solving problems.\n\n"
     "I’m here to assist you in your learning journey! 😊"
@@ -176,53 +176,128 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Handler for receiving document and logging chat hist
 async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        user_id = update.effective_chat.id
+        nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
+        telegram_handle = update.effective_user.username
 
-    user_id = update.effective_chat.id
-    nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
-    telegram_handle = update.effective_user.username
-
-    keyboard = [
-        [
-            InlineKeyboardButton("👎", callback_data='dislike'),
+        keyboard = [
+            [
+                InlineKeyboardButton("👎", callback_data='dislike'),
+            ]
         ]
-    ]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Check if user is authenticated
-    if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+        # Check if user is authenticated
+        if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+            await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
+            return
 
-        await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
-        return
-    
-    document = update.message.document
-    caption = update.message.caption
+        document = update.message.document
 
-    file_name = document.file_name
-    file_size = document.file_size
+        if not document:
+            await context.bot.send_message(chat_id=user_id, text="No document found in the message.")
+            return
 
+        caption = update.message.caption
 
-    logging.info(f"Document received: {file_name}, size: {file_size} bytes")
+        file_name = document.file_name
+        file_size = document.file_size
 
-    # Process the document (e.g., download and respond)
-    if file_name.endswith('.pdf'):
-        file = await update.message.effective_attachment.get_file()
-        file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
-        logging.info(f"File downloaded: {file_path}")
+        # Log the received document details
+        logging.info(f"Document received: {file_name}, size: {file_size} bytes")
 
-        await llm.load_document(file_path=file_path, nusnet_id=nusnet_id)
+        # Download the document
+        try:
+            file = await update.message.effective_attachment.get_file()
+            file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
+            logging.info(f"File downloaded: {file_path}")
+        except Exception as e:
+            logging.error(f"Error downloading file: {e}")
+            await context.bot.send_message(chat_id=user_id, text="Failed to download the document. Please try again.")
+            return
 
-        await context.bot.send_message(chat_id=user_id, text=f"PDF downloaded: {file_name}")
+        # Extract file type
+        try:
+            _, file_extension = os.path.splitext(file_path)
+            file_type = file_extension.lstrip(".").upper()
+        except Exception as e:
+            logging.error(f"Error extracting file type: {e}")
+            await context.bot.send_message(chat_id=user_id, text="Failed to determine the file type. Please check the file and try again.")
+            return
 
+        # Process the document
+        try:
+            await llm.load_document(file_path=file_path, nusnet_id=nusnet_id, file_type=file_type)
+            await context.bot.send_message(chat_id=user_id, text=f"{file_type} document successfully processed: {file_name}")
+        except Exception as e:
+            logging.error(f"Error processing document: {e}")
+            await context.bot.send_message(chat_id=user_id, text="Failed to process the document. Please try again later.")
+            return
+
+        # Handle caption if provided
         if caption:
+            try:
+                most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+                conversation_id = most_recent_convo if most_recent_convo else 1
+                response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
+                await context.bot.send_message(chat_id=user_id, text=response, reply_markup=reply_markup)
+            except Exception as e:
+                logging.error(f"Error handling caption response: {e}")
+                await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your caption. Please try again.")
 
-            most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-            conversation_id = most_recent_convo if most_recent_convo else 1
-            response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
-            await context.bot.send_message(chat_id=user_id, text=response, reply_markup=reply_markup)
+    except Exception as e:
+        logging.error(f"Unexpected error in document handler: {e}")
+        await context.bot.send_message(chat_id=user_id, text="An unexpected error occurred. Please try again later.")
 
-    else:
-        await context.bot.send_message(chat_id=user_id, text="Unsupported file type received.")
+# async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+#     user_id = update.effective_chat.id
+#     nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
+#     telegram_handle = update.effective_user.username
+
+#     keyboard = [
+#         [
+#             InlineKeyboardButton("👎", callback_data='dislike'),
+#         ]
+#     ]
+
+#     reply_markup = InlineKeyboardMarkup(keyboard)
+
+#     # Check if user is authenticated
+#     if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+
+#         await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
+#         return
+    
+#     document = update.message.document
+#     caption = update.message.caption
+
+#     file_name = document.file_name
+#     file_size = document.file_size
+
+#     file = await update.message.effective_attachment.get_file()
+#     file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
+#     logging.info(f"File downloaded: {file_path}")
+#     logging.info(f"Document received: {file_name}, size: {file_size} bytes")
+
+#     _, file_extension = os.path.splitext(file_path)
+#     # Extract file type (without the leading dot)
+#     file_type = file_extension.lstrip(".").upper()
+
+
+#     # Process the document (e.g., download and respond)
+#     await llm.load_document(file_path=file_path, nusnet_id=nusnet_id, file_type=file_type)
+
+#     await context.bot.send_message(chat_id=user_id, text=f"{file_type} downloaded: {file_name}")
+
+#     if caption:
+
+#         most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+#         conversation_id = most_recent_convo if most_recent_convo else 1
+#         response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
+#         await context.bot.send_message(chat_id=user_id, text=response, reply_markup=reply_markup)
 
 # Handler for rollcall of lab group
 async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
