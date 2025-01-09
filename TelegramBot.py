@@ -123,7 +123,7 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         response = await llm.analyse_message(nusnet_id=user_message)
 
-        await context.bot.send_message(chat_id=user_id, text=response)
+        await context.bot.send_message(chat_id=user_id, text=response, parse_mode="Markdown")
 
     elif user_nusnet_id == user_message and chat_db.user_exist(nusnet_id=user_message):
 
@@ -133,7 +133,7 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         response = await llm.analyse_message(nusnet_id=user_message)
 
-        await context.bot.send_message(chat_id=user_id, text=response)
+        await context.bot.send_message(chat_id=user_id, text=response, parse_mode="Markdown")
     
     else:
 
@@ -170,8 +170,29 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conversation_id = most_recent_convo if most_recent_convo  else 1
 
     response = await llm.response_message(message=user_message, nusnet_id=nusnet_id , conversation_id=conversation_id)
+
+    # Split the string into parts using triple backticks
+    parts = response.split("```")
+
+    for i, part in enumerate(parts):
+
+        text = part.strip()
+
+        if i % 2 == 0:  # Even index: plain text
+            try:
+                await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
+            except Exception as send_error:
+                logging.error(f"Error sending part of the message: {send_error}")
+                await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
+
+        else:  # Odd index: code block
+            try:
+                await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
+            except Exception as send_error:
+                logging.error(f"Error sending part of the message: {send_error}")
+                await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long", reply_markup=reply_markup)
+                
     logging.info(f"Message sent: {response}")
-    await context.bot.send_message(chat_id=user_id, text=response, reply_markup=reply_markup)
 
 
 # Handler for receiving document and logging chat hist
@@ -242,7 +263,28 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
                 conversation_id = most_recent_convo if most_recent_convo else 1
                 response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
-                await context.bot.send_message(chat_id=user_id, text=response, reply_markup=reply_markup)
+
+                # Split the string into parts using triple backticks
+                parts = response.split("```")
+
+                for i, part in enumerate(parts):
+
+                    text = part.strip()
+
+                    if i % 2 == 0:  # Even index: plain text
+                        try:
+                            await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
+                        except Exception as send_error:
+                            logging.error(f"Error sending part of the message: {send_error}")
+                            await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
+
+                    else:  # Odd index: code block
+                        try:
+                            await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
+                        except Exception as send_error:
+                            logging.error(f"Error sending part of the message: {send_error}")
+                            await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long", reply_markup=reply_markup)
+
             except Exception as e:
                 logging.error(f"Error handling caption response: {e}")
                 await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your caption. Please try again.")
@@ -319,7 +361,7 @@ async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             response = await llm.rollcall_message(nusnet_id=student_nusnet_id)
 
-            await context.bot.send_message(chat_id=user_id, text=response)
+            await context.bot.send_message(chat_id=user_id, text=response, parse_mode="Markdown")
 
     else:
 
