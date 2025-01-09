@@ -71,40 +71,85 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
     telegram_handle = update.effective_user.username
 
-    logging.info(f"Authenticating: {telegram_handle}")
+    logging.info(f"Authenticating user: {telegram_handle} (User ID: {user_id})")
 
+    try:
+        # Check if the user is authenticated
+        if chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+            logging.info(f"User {telegram_handle} (User ID: {user_id}) authenticated successfully.")
+            try:
+                await context.bot.send_message(chat_id=user_id, text=start_message, parse_mode="Markdown")
+            except Exception as send_error:
+                logging.error(f"Error sending authentication success message to user {user_id}: {send_error}")
+                await context.bot.send_message(chat_id=user_id, text="An error occurred while sending the welcome message. Please try again later.")
+        else:
+            logging.warning(f"User {telegram_handle} (User ID: {user_id}) failed authentication.")
+            try:
+                await context.bot.send_message(chat_id=user_id, text="You have not been authenticated to use this Chatbot!")
+            except Exception as send_error:
+                logging.error(f"Error sending authentication failure message to user {user_id}: {send_error}")
+    except Exception as auth_error:
+        logging.error(f"Error during authentication process for user {user_id}: {auth_error}")
+        try:
+            await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
+        except Exception as send_error:
+            logging.error(f"Error sending fallback error message to user {user_id}: {send_error}")
 
-    if chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle ):
-
-        #await context.bot.send_message(chat_id=user_id, text="Absolutely\\!", parse_mode="MarkdownV2")
-        await context.bot.send_message(chat_id=user_id, text=start_message, parse_mode="Markdown")
-    else:
-        await context.bot.send_message(chat_id=user_id, text="You have not been authenticated to use this Chatbot!")
 
 # Handler for /new command to start a new conversation
 async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     user_id = update.effective_chat.id
-    nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
 
-    chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
-    await context.bot.send_message(chat_id=user_id, text="A new conversation has started")
+    try:
+        # Retrieve user's NUSNET ID
+        nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
+    except Exception as db_error:
+        logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred while starting a new conversation. Please try again later.")
+        return
+
+    try:
+        # Start a new conversation
+        chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
+        await context.bot.send_message(chat_id=user_id, text="A new conversation has started.")
+        logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
+    except Exception as start_error:
+        logging.error(f"Error starting a new conversation for NUSNET ID {nusnet_id}: {start_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred while starting a new conversation. Please try again later.")
+
 
 # Handler for /clear_documents command to clear documents in vectorstores
 async def clear_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     user_id = update.effective_chat.id
-    nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
     telegram_handle = update.effective_user.username
 
-    # Check if user is authenticated
-    if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
-
-        await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
+    try:
+        # Retrieve user's NUSNET ID
+        nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
+    except Exception as db_error:
+        logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
         return
 
-    llm.clear_documents(nusnet_id=nusnet_id)
-    await context.bot.send_message(chat_id=user_id, text="Documents cleared!")
+    # Check if user is authenticated
+    try:
+        if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+            await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
+            return
+    except Exception as auth_error:
+        logging.error(f"Authentication error for user {user_id}: {auth_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
+        return
+
+    # Attempt to clear documents
+    try:
+        llm.clear_documents(nusnet_id=nusnet_id)
+        await context.bot.send_message(chat_id=user_id, text="Documents cleared!")
+        logging.info(f"Documents cleared successfully for user {user_id} (NUSNET ID: {nusnet_id}).")
+    except Exception as clear_error:
+        logging.error(f"Error clearing documents for NUSNET ID {nusnet_id}: {clear_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred while clearing documents. Please try again later.")
+
 
 # Handler for /analyse command to analyse learning behaviour
 async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -145,7 +190,6 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
-    nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
     telegram_handle = update.effective_user.username
 
     keyboard = [
@@ -156,20 +200,43 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Check if user is authenticated
-    if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+    try:
+        # Retrieve user's NUSNET ID
+        nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
+    except Exception as db_error:
+        logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
+        return
 
-        await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
+    # Check if user is authenticated
+    try:
+        if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+            await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
+            return
+    except Exception as auth_error:
+        logging.error(f"Authentication error for user {user_id}: {auth_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
         return
     
     user_message = update.message.text
+    logging.info(f"Message received from user {user_id}: {user_message}")
 
-    logging.info(f"Message received: {user_message}")
+    try:
+        # Retrieve most recent conversation ID
+        most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+        conversation_id = most_recent_convo if most_recent_convo else 1
+    except Exception as convo_error:
+        logging.error(f"Error retrieving recent conversation for NUSNET ID {nusnet_id}: {convo_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your conversation history. Please try again later.")
+        return
 
-    most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-    conversation_id = most_recent_convo if most_recent_convo  else 1
-
-    response = await llm.response_message(message=user_message, nusnet_id=nusnet_id , conversation_id=conversation_id)
+    try:
+        # Get response from LLM
+        response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id)
+    except Exception as llm_error:
+        logging.error(f"Error generating LLM response for user {user_id}: {llm_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
+        return
 
     # Split the string into parts using triple backticks
     parts = response.split("```")
@@ -192,7 +259,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logging.error(f"Error sending part of the message: {send_error}")
                 await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long", reply_markup=reply_markup)
                 
-    logging.info(f"Message sent: {response}")
+    logging.info(f"Message sent to user {user_id}: {response}")
 
 
 # Handler for receiving document and logging chat hist
@@ -293,79 +360,56 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Unexpected error in document handler: {e}")
         await context.bot.send_message(chat_id=user_id, text="An unexpected error occurred. Please try again later.")
 
-# async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-#     user_id = update.effective_chat.id
-#     nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
-#     telegram_handle = update.effective_user.username
-
-#     keyboard = [
-#         [
-#             InlineKeyboardButton("👎", callback_data='dislike'),
-#         ]
-#     ]
-
-#     reply_markup = InlineKeyboardMarkup(keyboard)
-
-#     # Check if user is authenticated
-#     if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
-
-#         await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
-#         return
-    
-#     document = update.message.document
-#     caption = update.message.caption
-
-#     file_name = document.file_name
-#     file_size = document.file_size
-
-#     file = await update.message.effective_attachment.get_file()
-#     file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
-#     logging.info(f"File downloaded: {file_path}")
-#     logging.info(f"Document received: {file_name}, size: {file_size} bytes")
-
-#     _, file_extension = os.path.splitext(file_path)
-#     # Extract file type (without the leading dot)
-#     file_type = file_extension.lstrip(".").upper()
-
-
-#     # Process the document (e.g., download and respond)
-#     await llm.load_document(file_path=file_path, nusnet_id=nusnet_id, file_type=file_type)
-
-#     await context.bot.send_message(chat_id=user_id, text=f"{file_type} downloaded: {file_name}")
-
-#     if caption:
-
-#         most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-#         conversation_id = most_recent_convo if most_recent_convo else 1
-#         response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
-#         await context.bot.send_message(chat_id=user_id, text=response, reply_markup=reply_markup)
-
 # Handler for rollcall of lab group
 async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     user_id = update.effective_chat.id
 
-    if chat_db.is_admin(user_id=user_id):
+    try:
+        # Check if the user is an admin
+        if not chat_db.is_admin(user_id=user_id):
+            logging.warning(f"Unauthorized rollcall attempt by user {user_id}.")
+            await context.bot.send_message(chat_id=user_id, text="User is unauthorised.")
+            return
+    except Exception as admin_check_error:
+        logging.error(f"Error checking admin status for user {user_id}: {admin_check_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred while checking authorization. Please try again later.")
+        return
 
+    try:
+        # Get the lab group associated with the user
         lab_group = chat_db.get_lab_group(user_id=user_id)
+    except Exception as lab_group_error:
+        logging.error(f"Error retrieving lab group for user {user_id}: {lab_group_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your lab group. Please try again later.")
+        return
+
+    try:
+        # Get the list of students in the lab group
         students = chat_db.get_lab_students(lab_group=lab_group)
-
-        logging.info(f"Rollcall: {lab_group}")
-
+        logging.info(f"Rollcall initiated for lab group {lab_group} by user {user_id}.")
         await context.bot.send_message(chat_id=user_id, text="Rollcall...give me a moment...")
+    except Exception as student_fetch_error:
+        logging.error(f"Error retrieving students for lab group {lab_group}: {student_fetch_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving student data. Please try again later.")
+        return
 
-        for student in students:
-
-            student_nusnet_id = student["nusnet_id"]
-
+    # Process each student in the lab group
+    for student in students:
+        student_nusnet_id = student["nusnet_id"]
+        try:
+            # Get rollcall response for each student
             response = await llm.rollcall_message(nusnet_id=student_nusnet_id)
+            try:
+                await context.bot.send_message(chat_id=user_id, text=response, parse_mode="Markdown")
+            except Exception as message_send_error:
+                logging.error(f"Error sending rollcall message for student {student_nusnet_id}: {message_send_error}")
+                await context.bot.send_message(chat_id=user_id, text=f"Error: Unable to send rollcall message for student {student_nusnet_id}.")
+        except Exception as rollcall_error:
+            logging.error(f"Error generating rollcall message for student {student_nusnet_id}: {rollcall_error}")
+            await context.bot.send_message(chat_id=user_id, text=f"Error: Unable to process rollcall for student {student_nusnet_id}.")
 
-            await context.bot.send_message(chat_id=user_id, text=response, parse_mode="Markdown")
+    logging.info(f"Rollcall completed for lab group {lab_group}.")
 
-    else:
-
-        await context.bot.send_message(chat_id=user_id, text="User is unauthorised")
 
 
 async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):

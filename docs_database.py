@@ -13,6 +13,7 @@ from langchain_community.document_loaders import BSHTMLLoader
 from langchain_community.document_loaders import TextLoader
 
 import chat_database
+from chromadb.errors import ChromaError
 from langchain_chroma import Chroma
 from uuid import uuid4
 
@@ -122,84 +123,37 @@ class Docs_DB:
                 except Exception as e:
                     logging.error(f"Error removing file: {file_path}. {e}")
 
-    # async def load_document(self, file_path: str, nusnet_id: str, file_type: str):
-
-    #     vector_store = Chroma(
-    #                             collection_name=nusnet_id,
-    #                             embedding_function=self.text_embedding,
-    #                             persist_directory=f"./chroma_langchain_db/{nusnet_id}",  # Where to save data locally, remove if not necessary
-    #                         )
-
-    #     match file_type:
-
-    #         case "pdf":
-
-    #             loader = PyPDFLoader(file_path)
-    #             docs = loader.load()
-    #             splits = self.text_splitter.split_documents(docs)
-
-    #             logging.info(f"Loading docs...")
-
-    #             uuids = [str(uuid4()) for _ in range(len(splits))]
-
-    #             # add documents to vectorstore
-    #             lst_docs = await vector_store.aadd_documents(documents=splits, ids=uuids)
-
-    #             logging.info(f"Added docs: {lst_docs}")
-
-    #         case "html":
-
-    #             loader = HTMLLoader(file_path)
-    #             docs = loader.load()
-    #             splits = self.text_splitter.split_documents(docs)
-
-    #             logging.info(f"Loading docs...")
-
-    #             uuids = [str(uuid4()) for _ in range(len(splits))]
-
-    #             # add documents to vectorstore
-    #             lst_docs = await vector_store.aadd_documents(documents=splits, ids=uuids)
-
-    #             logging.info(f"Added docs: {lst_docs}")
-
-    #         case _:
-
-    #             loader = TextLoader(file_path)
-    #             docs = loader.load()
-    #             splits = self.text_splitter.split_documents(docs)
-
-    #             logging.info(f"Loading docs...")
-
-    #             uuids = [str(uuid4()) for _ in range(len(splits))]
-
-    #             # add documents to vectorstore
-    #             lst_docs = await vector_store.aadd_documents(documents=splits, ids=uuids)
-
-    #             logging.info(f"Added docs: {lst_docs}")
-
-            
-
-
-
-    #     os.remove(file_path)
-
-    #     logging.info(f"Removed file")
-
-
     def clear_documents(self, nusnet_id: str):
+        try:
+            # Initialize Chroma vector store
+            vector_store = Chroma(
+                collection_name=nusnet_id,
+                embedding_function=self.text_embedding,
+                persist_directory=f"./chroma_langchain_db/{nusnet_id}",
+            )
+            
+            # Attempt to delete the collection
+            try:
+                vector_store.delete_collection()
+                logging.info(f"Deleted collection for {nusnet_id}.")
+            except ChromaError as e:
+                logging.error(f"Failed to delete collection for {nusnet_id}: {e}")
+                raise RuntimeError(f"Error deleting collection for {nusnet_id}.") from e
 
-        vector_store = Chroma(
-                                collection_name=nusnet_id,
-                                embedding_function=self.text_embedding,
-                                persist_directory=f"./chroma_langchain_db/{nusnet_id}",  # Where to save data locally, remove if not necessary
-                            )
+            # Attempt to remove the directory
+            try:
+                shutil.rmtree(f"./chroma_langchain_db/{nusnet_id}", ignore_errors=True)
+                logging.info(f"Removed directory for {nusnet_id}.")
+            except OSError as e:
+                logging.error(f"Failed to remove directory for {nusnet_id}: {e}")
+                raise RuntimeError(f"Error removing directory for {nusnet_id}.") from e
+
+            logging.info(f"Successfully cleared docs for {nusnet_id}.")
+
+        except Exception as e:
+            logging.error(f"An error occurred while clearing documents for {nusnet_id}: {e}")
+            raise RuntimeError(f"An unexpected error occurred while clearing documents for {nusnet_id}.") from e
         
-        vector_store.delete_collection()
-
-        shutil.rmtree(f"./chroma_langchain_db/{nusnet_id}", ignore_errors=True)
-
-        logging.info(f"Cleared docs for {nusnet_id}")
-
     def clear_all_docs(self):
 
         list_nusnet_id = self.chat_database.get_all_nusnet_ids()
