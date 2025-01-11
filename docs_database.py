@@ -11,6 +11,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import BSHTMLLoader
 from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import PythonLoader
 
 import chat_database
 from chromadb.errors import ChromaError
@@ -81,6 +82,14 @@ class Docs_DB:
                     except Exception as e:
                         logging.error(f"Error loading HTML file: {e}")
                         raise ValueError(f"Failed to process HTML file: {file_path}")
+                    
+                case "PY":
+                    try:
+                        loader = PythonLoader(file_path)  
+                        docs = loader.load()
+                    except Exception as e:
+                        logging.error(f"Error loading Python file: {e}")
+                        raise ValueError(f"Failed to process Python file: {file_path}")
 
                 case _:
                     try:

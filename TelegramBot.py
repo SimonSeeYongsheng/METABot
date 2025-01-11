@@ -411,40 +411,74 @@ async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info(f"Rollcall completed for lab group {lab_group}.")
 
 
-
+# Handler for handling reactions to chatbot response
 async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.message.chat.id  # Fetch user ID from the query
-    nusnet_id = chat_db.get_nusnet_id(user_id=user_id)  # Get user's NUSNET ID from the database
-   
+
     # Acknowledge the callback query
-    await query.answer()
+    try:
+        await query.answer()
+    except Exception as query_error:
+        logging.error(f"Error acknowledging callback query for user {user_id}: {query_error}")
 
-    await context.bot.send_message(chat_id=user_id, text="We apologise for the error. The recent conversation will be forwarded to the TA for review. 🙏")
+    # Retrieve user's NUSNET ID
+    try:
+        nusnet_id = chat_db.get_nusnet_id(user_id=user_id)  # Get user's NUSNET ID from the database
+    except Exception as db_error:
+        logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your data. Please try again later.")
+        return
+    
 
-    instructors = chat_db.get_instructors(user_id=user_id)
+    try:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text="We apologise for the error. The recent conversation will be forwarded to the TA for review. 🙏"
+        )
+    except Exception as send_error:
+        logging.error(f"Error sending apology message to user {user_id}: {send_error}")
+
+    try:
+        instructors = chat_db.get_instructors(user_id=user_id)
+    except Exception as db_error:
+        logging.error(f"Error retrieving instructors for user {user_id}: {db_error}")
+        await context.bot.send_message(chat_id=user_id, text="An error occurred while fetching instructor information. Please try again later.")
+        return
+
     message_id = query.message.message_id
 
     for instructor_user_id in instructors:
-
-        await context.bot.forward_message(
-            chat_id=instructor_user_id,
-            from_chat_id=user_id,
-            message_id=(message_id - 1)
+        try:
+            # Forward the most recent messages to instructors
+            await context.bot.forward_message(
+                chat_id=instructor_user_id,
+                from_chat_id=user_id,
+                message_id=(message_id - 1)
             )
-
-        await context.bot.forward_message(
-            chat_id=instructor_user_id,
-            from_chat_id=user_id,
-            message_id=message_id
+            await context.bot.forward_message(
+                chat_id=instructor_user_id,
+                from_chat_id=user_id,
+                message_id=message_id
             )
+        except Exception as forward_error:
+            logging.error(f"Error forwarding message to instructor {instructor_user_id} from user {user_id}: {forward_error}")
         
-    await context.bot.send_message(chat_id=user_id, text="We are saving the conversation for review and starting a new conversation... 📝")
-    recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-    chat_db.input_feedback(nusnet_id=nusnet_id, conversation_id=recent_convo,message=query.message.text)
+    try:
 
-    chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
-    await context.bot.send_message(chat_id=user_id, text="A new conversation has started")
+        await context.bot.send_message(
+            chat_id=user_id,
+            text="We are saving the conversation for review and starting a new conversation... 📝"
+        )
+
+        recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+        chat_db.input_feedback(nusnet_id=nusnet_id, conversation_id=recent_convo,message=query.message.text)
+        chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
+        
+        await context.bot.send_message(chat_id=user_id, text="A new conversation has started")
+
+    except Exception as send_error:
+        logging.error(f"Error sending review and restart message to user {user_id}: {send_error}")
 
 def clear_all_docs():
 
