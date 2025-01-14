@@ -1,3 +1,5 @@
 .env
 chroma_langchain_db/
 test.ipynb
+*.pyc
+__pycache__/
