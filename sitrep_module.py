@@ -3,12 +3,12 @@ from langchain_core.output_parsers import StrOutputParser
 from datetime import datetime
 
 
-class Rollcall:
+class Sitrep:
 
     def __init__(self, llm):
 
         self.llm = llm
-        self.rollcall_system_prompt = (
+        self.sitrep_system_prompt = (
     """
     You are an AI assistant tasked with analyzing the most recent topic of discussion from a provided chat history. 
     Your primary objectives are:
@@ -18,10 +18,10 @@ class Rollcall:
     3. **Highlight Key Details**: Include only critical points or questions from the recent exchanges.
 
     The report should begin with the following format:
-    *Here is a rollcall report of {nusnet_id}, {name} as of {datetime}:*
+    *Here is a sitrep report of {nusnet_id}, {name} as of {datetime}:*
 
     **If no chat history is available for this user, respond with:**
-    *There is no chat history available for {nusnet_id}, {name} as of {datetime}. Therefore, no rollcall report can be provided at this time.*
+    *There is no chat history available for {nusnet_id}, {name} as of {datetime}. Therefore, no sitrep report can be provided at this time.*
 
     If chat history exists, follow these guidelines to generate the report:
     - Review the chat history from the most recent to earlier messages.
@@ -63,20 +63,20 @@ class Rollcall:
 )
 
         
-        self.rollcall_prompt = ChatPromptTemplate.from_messages(
+        self.sitrep_prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", self.rollcall_system_prompt),
+                ("system", self.sitrep_system_prompt),
                 MessagesPlaceholder("chat_history"),
-                ("human", "Give me a rollcall report of the user using the previous chat history.\
+                ("human", "Give me a sitrep report of the user using the previous chat history.\
                   **Note**: Ensure the entire response does not exceed 4096 characters.")
             ]
         )
 
-        self.rollcall_chain = self.rollcall_prompt | self.llm | StrOutputParser()
+        self.sitrep_chain = self.sitrep_prompt | self.llm | StrOutputParser()
 
-    async def get_rollcall(self, name : str, nusnet_id : str, messages):
+    async def get_sitrep(self, name : str, nusnet_id : str, messages):
 
-        response = self.rollcall_chain.invoke({"nusnet_id": nusnet_id, "name": name, 
+        response = self.sitrep_chain.invoke({"nusnet_id": nusnet_id, "name": name, 
                                               "datetime": datetime.now().replace(microsecond=0), "chat_history": messages})
     
         return response

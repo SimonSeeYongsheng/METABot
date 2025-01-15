@@ -37,7 +37,7 @@ import logging
 # from datetime import datetime
 import intent_classifier
 import analysis_module
-import rollcall_module
+import sitrep_module
 import general_module
 import teach_module
 import guidance_module
@@ -74,7 +74,7 @@ class LLM:
         
         self.intent = intent_classifier.Intent_Classifier(self.llm)
         self.analyse = analysis_module.Analyser(self.llm)
-        self.rollcall = rollcall_module.Rollcall(self.llm)
+        self.sitrep = sitrep_module.Sitrep(self.llm)
         self.general = general_module.General(llm=self.llm, database=self.chat_database)
         self.guide = guidance_module.Guide(llm=self.llm, database=self.chat_database)
 
@@ -94,15 +94,15 @@ class LLM:
         
         return response
     
-    # Response to rollcall request
-    async def rollcall_message(self, nusnet_id : str):
+    # Response to sitrep request
+    async def sitrep_message(self, nusnet_id : str):
 
         messages = self.chat_database.get_all_conversation(nusnet_id=nusnet_id)
         name = self.chat_database.get_name(nusnet_id=nusnet_id)
 
-        response = await self.rollcall.get_rollcall(name=name, nusnet_id=nusnet_id, messages=messages)
+        response = await self.sitrep.get_sitrep(name=name, nusnet_id=nusnet_id, messages=messages)
         
-        logging.info(f"Rollcall report: {response}")
+        logging.info(f"Sitrep report: {response}")
         
         return response
 

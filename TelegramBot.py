@@ -48,7 +48,7 @@ start_message = (
     "🗑️ */clear_docs*: Clear any uploaded documents.\n"
     "📊 */analyse*: For students, this analyses your learning behaviour and provides personalized insights.\n"
     "🧑‍🏫 */analyse [nusnet_id]* to view your student’s learning behaviour *(for teachers only)*.\n"
-    "📝 */rollcall*: Get updates about the lab group *(for teachers only)*.\n\n"
+    "📝 */sitrep*: Get updates about the lab group *(for teachers only)*.\n\n"
     "You can upload your learning materials, then start chatting to:\n"
     "📚 *Teach content*: Dive into the material and learn interactively.\n"
     "💡 *Ask for guidance*: Get help understanding concepts or solving problems.\n\n"
@@ -62,7 +62,7 @@ async def set_command_menu(bot):
         BotCommand("new", "Start a new conversation"),
         BotCommand("clear_docs", "Clear uploaded documents"),
         BotCommand("analyse", "Analyse learning behaviour (/analyse [nusnet_id] for teachers only)"),
-        BotCommand("rollcall", "Get updates about the lab group (for teachers only)"),
+        BotCommand("sitrep", "Get updates about the lab group (for teachers only)"),
     ]
     await bot.set_my_commands(commands)
 
@@ -360,14 +360,14 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Unexpected error in document handler: {e}")
         await context.bot.send_message(chat_id=user_id, text="An unexpected error occurred. Please try again later.")
 
-# Handler for rollcall of lab group
-async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Handler for sitrep of lab group
+async def sitrep(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
 
     try:
         # Check if the user is an admin
         if not chat_db.is_admin(user_id=user_id):
-            logging.warning(f"Unauthorized rollcall attempt by user {user_id}.")
+            logging.warning(f"Unauthorized sitrep attempt by user {user_id}.")
             await context.bot.send_message(chat_id=user_id, text="User is unauthorised.")
             return
     except Exception as admin_check_error:
@@ -386,8 +386,8 @@ async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # Get the list of students in the lab group
         students = chat_db.get_lab_students(lab_group=lab_group)
-        logging.info(f"Rollcall initiated for lab group {lab_group} by user {user_id}.")
-        await context.bot.send_message(chat_id=user_id, text="Rollcall...give me a moment...")
+        logging.info(f"Sitrep initiated for lab group {lab_group} by user {user_id}.")
+        await context.bot.send_message(chat_id=user_id, text="Sitrep...give me a moment...")
     except Exception as student_fetch_error:
         logging.error(f"Error retrieving students for lab group {lab_group}: {student_fetch_error}")
         await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving student data. Please try again later.")
@@ -397,18 +397,18 @@ async def rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for student in students:
         student_nusnet_id = student["nusnet_id"]
         try:
-            # Get rollcall response for each student
-            response = await llm.rollcall_message(nusnet_id=student_nusnet_id)
+            # Get sitrep response for each student
+            response = await llm.sitrep_message(nusnet_id=student_nusnet_id)
             try:
                 await context.bot.send_message(chat_id=user_id, text=response, parse_mode="Markdown")
             except Exception as message_send_error:
-                logging.error(f"Error sending rollcall message for student {student_nusnet_id}: {message_send_error}")
-                await context.bot.send_message(chat_id=user_id, text=f"Error: Unable to send rollcall message for student {student_nusnet_id}.")
-        except Exception as rollcall_error:
-            logging.error(f"Error generating rollcall message for student {student_nusnet_id}: {rollcall_error}")
-            await context.bot.send_message(chat_id=user_id, text=f"Error: Unable to process rollcall for student {student_nusnet_id}.")
+                logging.error(f"Error sending sitrep message for student {student_nusnet_id}: {message_send_error}")
+                await context.bot.send_message(chat_id=user_id, text=f"Error: Unable to send sitrep message for student {student_nusnet_id}.")
+        except Exception as sitrep_error:
+            logging.error(f"Error generating sitrep message for student {student_nusnet_id}: {sitrep_error}")
+            await context.bot.send_message(chat_id=user_id, text=f"Error: Unable to process sitrep for student {student_nusnet_id}.")
 
-    logging.info(f"Rollcall completed for lab group {lab_group}.")
+    logging.info(f"Sitrep completed for lab group {lab_group}.")
 
 
 # Handler for handling reactions to chatbot response
@@ -513,7 +513,7 @@ async def main():
     new_convo_handler = CommandHandler('new', new)
     clear_document_handler = CommandHandler("clear_docs", clear_docs)
     analyse_handler = CommandHandler("analyse", analyse)
-    rollcall_handler = CommandHandler("rollcall", rollcall)
+    sitrep_handler = CommandHandler("sitrep", sitrep)
     message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), message)
     document_handler = MessageHandler(filters.ATTACHMENT & (~filters.COMMAND), document)
     reaction_handler = CallbackQueryHandler(handle_reactions)
@@ -523,7 +523,7 @@ async def main():
     application.add_handler(new_convo_handler)
     application.add_handler(clear_document_handler)
     application.add_handler(analyse_handler)
-    application.add_handler(rollcall_handler)
+    application.add_handler(sitrep_handler)
     application.add_handler(message_handler)
     application.add_handler(document_handler)
     application.add_handler(reaction_handler)
