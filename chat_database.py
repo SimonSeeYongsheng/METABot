@@ -7,6 +7,7 @@ from dotenv import load_dotenv, dotenv_values
 from pymongo import MongoClient
 from datetime import datetime
 from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
+import csv
 
 
 load_dotenv() # Load environment variables from .env file
@@ -130,11 +131,12 @@ class Chat_DB:
     def get_all_nusnet_ids(self):
         return self.users_collection.distinct("nusnet_id")
     
-    def input_feedback(self, nusnet_id: str, conversation_id: str, message: str):
+    def input_feedback(self, nusnet_id: str, conversation_id: str, message: str, prompt: str):
 
         self.feedback_collection.insert_one({
             'nusnet_id' : nusnet_id,
             'conversation_id': conversation_id,
+            'user_prompt' : prompt,
             'llm_wrong_response': message
         })
 
@@ -147,6 +149,29 @@ class Chat_DB:
         instructors = list(map(lambda x: x.get("user_id"), self.users_collection.find({ "lab_group": lab_group, "is_admin" :True}).to_list()))
 
         return instructors
+    
+    def export_chat_collection_to_csv(self, file_path: str):
+        # Export the entire chat collection to a CSV file.
+        try:
+            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                # Write header row based on the keys of the documents
+                cursor = self.chat_collection.find()
+                first_doc = next(cursor, None)
+                if not first_doc:
+                    raise ValueError("No chat history to export.")
+                
+                headers = first_doc.keys()
+                writer.writerow(headers)
+                # Write data rows
+                writer.writerow(first_doc.values())
+                for document in cursor:
+                    writer.writerow(document.values())
+
+        except Exception as e:
+            raise RuntimeError("Failed to export chat collection.") from e
+
+
 
 
 

@@ -22,6 +22,8 @@ import llm_module # module for the LLM
 import chat_database # module for the chat database
 import docs_database # module for the doc database
 
+from datetime import datetime
+
 load_dotenv() # Load environment variables from .env file
 
 TELE_BOT_TOKEN = os.environ.get('TELE_BOT_TOKEN')
@@ -48,7 +50,8 @@ start_message = (
     "🗑️ */clear_docs*: Clear any uploaded documents.\n"
     "📊 */analyse*: For students, this analyses your learning behaviour and provides personalized insights.\n"
     "🧑‍🏫 */analyse [nusnet_id]* to view your student’s learning behaviour *(for teachers only)*.\n"
-    "📝 */sitrep*: Get updates about the lab group *(for teachers only)*.\n\n"
+    "📝 */sitrep*: Get updates about the lab group *(for teachers only)*.\n"
+    "📁 */export*: Export the chat history to a file *(for teachers only)*.\n\n"
     "You can upload your learning materials, then start chatting to:\n"
     "📚 *Teach content*: Dive into the material and learn interactively.\n"
     "💡 *Ask for guidance*: Get help understanding concepts or solving problems.\n\n"
@@ -63,6 +66,7 @@ async def set_command_menu(bot):
         BotCommand("clear_docs", "Clear uploaded documents"),
         BotCommand("analyse", "Analyse learning behaviour (/analyse [nusnet_id] for teachers only)"),
         BotCommand("sitrep", "Get updates about the lab group (for teachers only)"),
+        BotCommand("export", "Export chat history (for teachers only)"),
     ]
     await bot.set_my_commands(commands)
 
@@ -192,14 +196,6 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
     telegram_handle = update.effective_user.username
 
-    keyboard = [
-        [
-            InlineKeyboardButton("👎", callback_data='dislike'),
-        ]
-    ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
     try:
         # Retrieve user's NUSNET ID
         nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
@@ -218,6 +214,8 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
         return
     
+    recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+    metadata = f"{recent_convo}|{{message_count}}"
     user_message = update.message.text
     logging.info(f"Message received from user {user_id}: {user_message}")
 
@@ -246,6 +244,13 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = part.strip()
 
         if i % 2 == 0:  # Even index: plain text
+            keyboard = [
+                [
+            InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 1)),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
             try:
                 await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
             except Exception as send_error:
@@ -253,6 +258,14 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
 
         else:  # Odd index: code block
+
+            keyboard = [
+                [
+            InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 1)),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
             try:
                 await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
             except Exception as send_error:
@@ -269,20 +282,14 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
         telegram_handle = update.effective_user.username
 
-        keyboard = [
-            [
-                InlineKeyboardButton("👎", callback_data='dislike'),
-            ]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
         # Check if user is authenticated
         if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
             await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
             return
 
         document = update.message.document
+        recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+        metadata = f"{recent_convo}|{{message_count}}"
 
         if not document:
             await context.bot.send_message(chat_id=user_id, text="No document found in the message.")
@@ -339,6 +346,14 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text = part.strip()
 
                     if i % 2 == 0:  # Even index: plain text
+
+                        keyboard = [
+                            [
+                        InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 2)),
+                            ]
+                        ]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+
                         try:
                             await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
                         except Exception as send_error:
@@ -346,6 +361,14 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
 
                     else:  # Odd index: code block
+
+                        keyboard = [
+                            [
+                        InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 2)),
+                            ]
+                        ]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+
                         try:
                             await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
                         except Exception as send_error:
@@ -415,10 +438,14 @@ async def sitrep(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.message.chat.id  # Fetch user ID from the query
+    callback_data = query.data  # Retrieve the callback data
 
     # Acknowledge the callback query
     try:
         await query.answer()
+        metadata_parts = callback_data.split("|")
+        convo_id = int(metadata_parts[0])
+        user_message = int(metadata_parts[1])
     except Exception as query_error:
         logging.error(f"Error acknowledging callback query for user {user_id}: {query_error}")
 
@@ -451,10 +478,10 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for instructor_user_id in instructors:
         try:
             # Forward the most recent messages to instructors
-            await context.bot.forward_message(
+            forwarded_message = await context.bot.forward_message(
                 chat_id=instructor_user_id,
                 from_chat_id=user_id,
-                message_id=(message_id - 1)
+                message_id=(message_id - user_message)
             )
             await context.bot.forward_message(
                 chat_id=instructor_user_id,
@@ -465,20 +492,45 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"Error forwarding message to instructor {instructor_user_id} from user {user_id}: {forward_error}")
         
     try:
-
-        await context.bot.send_message(
-            chat_id=user_id,
-            text="We are saving the conversation for review and starting a new conversation... 📝"
-        )
-
-        recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-        chat_db.input_feedback(nusnet_id=nusnet_id, conversation_id=recent_convo,message=query.message.text)
-        chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
+        prompt = forwarded_message.text if forwarded_message.text else forwarded_message.caption
+        chat_db.input_feedback(nusnet_id=nusnet_id, conversation_id=convo_id,message=query.message.text,prompt=prompt)
         
-        await context.bot.send_message(chat_id=user_id, text="A new conversation has started")
+        await context.bot.send_message(chat_id=user_id, text="Conversation has been saved for review. 📝")
 
     except Exception as send_error:
         logging.error(f"Error sending review and restart message to user {user_id}: {send_error}")
+
+# Handler for handling chat history export
+async def export(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /export command to export the chat collection."""
+    user_id = update.effective_chat.id
+    file_path = f"chat_history_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+
+    try:
+        # Check if the user is an admin
+        if not chat_db.is_admin(user_id=user_id):
+            await context.bot.send_message(chat_id=user_id, text="Unauthorized access. This command is for admins only.")
+            return
+
+        # Export the chat collection to a CSV file
+        chat_db.export_chat_collection_to_csv(file_path)
+
+        # Send the file to the admin
+        with open(file_path, 'rb') as document:
+            await context.bot.send_document(chat_id=user_id, document=document)
+    except Exception as e:
+        logging.error(f"Error exporting chat collection: {e}")
+        await context.bot.send_message(chat_id=user_id, text="Failed to export chat collection.")
+    finally:
+        # Ensure the file is deleted after being sent
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as delete_error:
+                logging.error(f"Error deleting file {file_path}: {delete_error}")
+
+
+
 
 def clear_all_docs():
 
@@ -517,6 +569,7 @@ async def main():
     message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), message)
     document_handler = MessageHandler(filters.ATTACHMENT & (~filters.COMMAND), document)
     reaction_handler = CallbackQueryHandler(handle_reactions)
+    export_handler = CommandHandler("export", export)
 
     application.add_handler(reaction_handler)
     application.add_handler(start_handler)
@@ -527,6 +580,7 @@ async def main():
     application.add_handler(message_handler)
     application.add_handler(document_handler)
     application.add_handler(reaction_handler)
+    application.add_handler(export_handler)
 
     # Set menu commands
     await set_command_menu(application.bot)
