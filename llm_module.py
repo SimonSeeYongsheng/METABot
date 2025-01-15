@@ -39,7 +39,6 @@ import intent_classifier
 import analysis_module
 import sitrep_module
 import general_module
-import teach_module
 import guidance_module
 
 logging.basicConfig(
