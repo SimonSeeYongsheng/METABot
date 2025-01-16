@@ -66,8 +66,8 @@ class Sitrep:
         self.sitrep_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", self.sitrep_system_prompt),
-                MessagesPlaceholder("chat_history"),
-                ("human", "Give me a sitrep report of the user using the previous chat history.\
+                # MessagesPlaceholder("chat_history"),
+                ("human", f"Chat history: {{chat_history}}\n\n Give me a sitrep report of the user using the previous chat history.\
                   **Note**: Ensure the entire response does not exceed 4096 characters.")
             ]
         )

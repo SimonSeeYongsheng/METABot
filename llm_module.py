@@ -40,6 +40,7 @@ import analysis_module
 import sitrep_module
 import general_module
 import guidance_module
+import teach_module
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -55,7 +56,7 @@ class LLM:
 
 
         if LLM == None:
-            self.llm = ChatOpenAI(model="gpt-4o-mini", api_key= os.environ.get('OPENAI_API_KEY'))
+            self.llm = ChatOpenAI(model="gpt-4o", api_key= os.environ.get('OPENAI_API_KEY'))
         else:
             self.llm = LLM
 
@@ -75,6 +76,7 @@ class LLM:
         self.analyse = analysis_module.Analyser(self.llm)
         self.sitrep = sitrep_module.Sitrep(self.llm)
         self.general = general_module.General(llm=self.llm, database=self.chat_database)
+        self.teach = teach_module.Teacher(llm=self.llm, database=self.chat_database)
         self.guide = guidance_module.Guide(llm=self.llm, database=self.chat_database)
 
         
@@ -98,6 +100,8 @@ class LLM:
 
         messages = self.chat_database.get_all_conversation(nusnet_id=nusnet_id)
         name = self.chat_database.get_name(nusnet_id=nusnet_id)
+
+        print("Messages", messages)
 
         response = await self.sitrep.get_sitrep(name=name, nusnet_id=nusnet_id, messages=messages)
         
@@ -126,6 +130,10 @@ class LLM:
             case "Guidance":
                 response = await self.guide.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
                 logging.info(f"Guidance: {response}")
+
+            case "Teach":
+                response = await self.teach.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
+                logging.info(f"Teaching: {response}")
 
         return response
 

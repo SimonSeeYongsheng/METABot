@@ -267,8 +267,8 @@ class Analyser:
         self.anaylse_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", self.analyse_system_prompt),
-                MessagesPlaceholder("chat_history"),
-                ("human", "Give me a learning analysis report of the user using the previous chat history.\
+                # MessagesPlaceholder("chat_history"),
+                ("human", f"Chat history: {{chat_history}}\n\n Give me a learning analysis report of the user using the previous chat history.\
                   **Note**: Ensure the entire response does not exceed 4096 characters.")
             ]
         )
