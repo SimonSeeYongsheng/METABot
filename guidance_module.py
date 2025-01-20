@@ -6,6 +6,9 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.output_parsers import StrOutputParser
 
 
+class StrOutputParserWithAnswer(StrOutputParser):
+    def parse(self, output: str) -> dict:
+        return {"answer": output}  # Wrap output in a dictionary with the 'answer' key
 
 class Guide:
 
@@ -306,7 +309,7 @@ class Guide:
         )
 
         # self.question_answer_chain = create_stuff_documents_chain(self.llm, self.prompt)
-        self.question_answer_chain = self.prompt | self.llm | StrOutputParser()
+        self.question_answer_chain = self.prompt | self.llm | StrOutputParserWithAnswer() # StrOutputParser()
 
     async def get_response(self, message: str, nusnet_id : str, conversation_id: str, user_context: str):
 
@@ -343,4 +346,4 @@ class Guide:
 
         response = conversational_chain.invoke({"input": message, "context":user_context}, config=config)
 
-        return response
+        return response['answer']
