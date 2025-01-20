@@ -284,7 +284,7 @@ class Teacher:
 
         # )
 
-    async def get_response(self, message: str, nusnet_id : str, conversation_id: str, retriever):
+    async def get_response(self, message: str, nusnet_id : str, conversation_id: str, user_context:str):
 
         rag_chain = create_retrieval_chain(retriever, self.question_answer_chain)
 

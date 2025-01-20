@@ -35,12 +35,13 @@ from langchain.chains.combine_documents.base import (
 
 import logging
 # from datetime import datetime
-import intent_classifier
+# import intent_classifier
 import analysis_module
 import sitrep_module
 import general_module
 import guidance_module
 import teach_module
+import assignment_classifier
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -72,7 +73,8 @@ class LLM:
 
 
         
-        self.intent = intent_classifier.Intent_Classifier(self.llm)
+        # self.intent = intent_classifier.Intent_Classifier(self.llm)
+        self.assignment = assignment_classifier.Assignment_Classifier(self.llm)
         self.analyse = analysis_module.Analyser(self.llm)
         self.sitrep = sitrep_module.Sitrep(self.llm)
         self.general = general_module.General(llm=self.llm, database=self.chat_database)
@@ -82,6 +84,16 @@ class LLM:
         
         # self.vector_store = InMemoryVectorStore(GoogleGenerativeAIEmbeddings(model=self.text_embedding))
         # self.vector_store = InMemoryVectorStore(embedding=OpenAIEmbeddings())
+
+    # Response to assignment classification
+    async def assignment_message(self, message : str):
+
+        assignment_name = await self.assignment.get_assignment(message=message)
+
+        logging.info(f"Assignment: {assignment_name}")
+
+        return assignment_name
+
 
     # Response to analysis request
     async def analyse_message(self, nusnet_id : str):
@@ -113,26 +125,21 @@ class LLM:
 
 
     # Response to text message    
-    async def response_message(self, message: str, nusnet_id : str, conversation_id: str):
-
-        intention = await self.intent.get_intent(message=message)
+    async def response_message(self, message: str, nusnet_id : str, conversation_id: str, intention: str, user_context: str):
 
         logging.info(f"Intent report: {intention}")
 
-        retriever = await self.docs_database.as_retriever(nusnet_id=nusnet_id)
-
         match intention:
 
-            case "General":
-                response = await self.general.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
+            case "general":
+                response = await self.general.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id)
                 logging.info(f"General: {response}")
 
-            case "Guidance":
-                response = await self.guide.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
-                logging.info(f"Guidance: {response}")
+            case "guide":
+                response = await self.guide.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id,user_context = user_context)
 
-            case "Teach":
-                response = await self.teach.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, retriever = retriever)
+            case "teach":
+                response = await self.teach.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id, user_context = user_context)
                 logging.info(f"Teaching: {response}")
 
         return response

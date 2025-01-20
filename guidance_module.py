@@ -3,6 +3,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.runnables import ConfigurableFieldSpec
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.output_parsers import StrOutputParser
 
 
 
@@ -304,14 +305,13 @@ class Guide:
             ]
         )
 
-        self.question_answer_chain = create_stuff_documents_chain(self.llm, self.prompt)
+        # self.question_answer_chain = create_stuff_documents_chain(self.llm, self.prompt)
+        self.question_answer_chain = self.prompt | self.llm | StrOutputParser()
 
-    async def get_response(self, message: str, nusnet_id : str, conversation_id: str, retriever):
+    async def get_response(self, message: str, nusnet_id : str, conversation_id: str, user_context: str):
 
-        rag_chain = create_retrieval_chain(retriever, self.question_answer_chain)
-
-        conversational_rag_chain = RunnableWithMessageHistory(
-            rag_chain,
+        conversational_chain = RunnableWithMessageHistory(
+            self.question_answer_chain,
             self.database.get_by_session_id,
             input_messages_key="input",
             history_messages_key="chat_history",
@@ -341,6 +341,6 @@ class Guide:
             "configurable": {"nusnet_id": nusnet_id , "conversation_id": conversation_id}
         }
 
-        response = conversational_rag_chain.invoke({"input": message}, config=config)
-        
-        return response['answer']
+        response = conversational_chain.invoke({"input": message, "context":user_context}, config=config)
+
+        return response
