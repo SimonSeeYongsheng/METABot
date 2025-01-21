@@ -22,7 +22,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.runnables import ConfigurableFieldSpec
 import chat_database
-import docs_database
+
 
 from langchain_chroma import Chroma
 from uuid import uuid4
@@ -53,11 +53,11 @@ database_name = 'telegram_bot_db'
 chat_collection_name = 'chat_history'
 
 class LLM:
-    def __init__(self, LLM = None, Chat_Database = None, Docs_Database = None):
+    def __init__(self, LLM = None, Chat_Database = None):
 
 
         if LLM == None:
-            self.llm = ChatOpenAI(model="gpt-4o", api_key= os.environ.get('OPENAI_API_KEY'))
+            self.llm = ChatOpenAI(model="gpt-4o-mini", api_key= os.environ.get('OPENAI_API_KEY'))
         else:
             self.llm = LLM
 
@@ -66,10 +66,6 @@ class LLM:
         else:
             self.chat_database = Chat_Database
 
-        if Docs_Database == None:
-            self.docs_database = docs_database.Docs_DB(Chat_Database=self.chat_database)
-        else:
-            self.docs_database = Docs_Database
 
 
         
@@ -144,11 +140,3 @@ class LLM:
 
         return response
 
-    # Response to document attachment
-    async def load_document(self, file_path: str, nusnet_id: str, file_type: str):
-
-        await self.docs_database.load_document(file_path=file_path, nusnet_id=nusnet_id, file_type=file_type)
-
-    def clear_documents(self, nusnet_id: str):
-
-        self.docs_database.clear_documents(nusnet_id=nusnet_id)

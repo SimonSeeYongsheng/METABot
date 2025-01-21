@@ -36,8 +36,8 @@ logging.basicConfig(
 )
 
 chat_db = chat_database.Chat_DB()
-doc_db = docs_database.Docs_DB(Chat_Database=chat_db)
-llm = llm_module.LLM(Chat_Database=chat_db, Docs_Database=doc_db)
+
+llm = llm_module.LLM(Chat_Database=chat_db)
 docs_process = docs_processor.Docs_processor()
 
 scheduled_clear_time = "04:00"
@@ -70,7 +70,8 @@ guidance_message_bold = (
     "📘 Lecture 3\n"
     "📗 Tutorial 5\n"
     "🎯 Mission 10\n"
-    "🗺️ Sidequest 5.2\n\n"
+    "🗺️ Sidequest 5.2\n"
+    "📙 Recitation 4\n\n"
     "Feel free to type the exact name or number of your assignment!"
 )
 
@@ -79,40 +80,81 @@ guidance_message = (
     "📘 Lecture 3\n"
     "📗 Tutorial 5\n"
     "🎯 Mission 10\n"
-    "🗺️ Sidequest 5.2\n\n"
+    "🗺️ Sidequest 5.2\n"
+    "📙 Recitation 4\n\n"
     "Feel free to type the exact name or number of your assignment!"
 )
 
-contextual_info_message_bold = (
-    "Please send any relevant information about the assignment *replying to this message*.\n\nYou can upload a file in one of the following formats:\n"
+guidance_contextual_info_message_bold = (
+    "Please send any relevant information about the assignment by *replying to this message*.\n\nYou can upload a file in one of the following formats:\n"
     "📄 PDF (e.g., .pdf)\n"
     "📜 Text (e.g., .txt or plain text in this chat)\n"
     "🐍 Python Code (e.g., .py files)\n\n"
-    "Once your documents have been processed or if you have no documents to upload, type /query to proceed with your questions or requests."
+    "Once your documents have been *processed* or if you have no documents to upload, press the *🔍 Query* button below to proceed with your questions or requests."
 )
 
-contextual_info_message = (
-    "Please send any relevant information about the assignment replying to this message.\n\nYou can upload a file in one of the following formats:\n"
+guidance_contextual_info_message = (
+    "Please send any relevant information about the assignment by replying to this message.\n\nYou can upload a file in one of the following formats:\n"
     "📄 PDF (e.g., .pdf)\n"
     "📜 Text (e.g., .txt or plain text in this chat)\n"
     "🐍 Python Code (e.g., .py files)\n\n"
-    "Once your documents have been processed or if you have no documents to upload, type /query to proceed with your questions or requests."
+    "Once your documents have been processed or if you have no documents to upload, press the 🔍 Query button below to proceed with your questions or requests."
 )
 
 guidance_query_message_bold = (
-    "What queries do you have? Feel free to ask anything specific so I can assist you effectively. For example:\n"
+    "What queries do you have? Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
     "❓ Do you have questions about the assignment requirements?\n"
-    "🔍 Do you need clarification on a concept or topic?\n"
+    "📝 Are you unsure about how to approach or structure the assignment?\n"
     "💻 Are you facing issues with your code or logic?\n\n"
     "Please type your query below by *replying to this message*, and I'll do my best to help!"
 )
 
 guidance_query_message = (
-    "What queries do you have? Feel free to ask anything specific so I can assist you effectively. For example:\n"
+    "What queries do you have? Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
     "❓ Do you have questions about the assignment requirements?\n"
-    "🔍 Do you need clarification on a concept or topic?\n"
+    "📝 Are you unsure about how to approach or structure the assignment?\n"
     "💻 Are you facing issues with your code or logic?\n\n"
     "Please type your query below by replying to this message, and I'll do my best to help!"
+)
+
+teach_contextual_info_message_bold = (
+    "Please send any relevant information about the lecture materials, concepts, or topic by *replying to this message*.\n\n"
+    "You can upload a file in one of the following formats:\n"
+    "📄 PDF (e.g., .pdf)\n"
+    "📜 Text (e.g., .txt or plain text in this chat)\n"
+    "🐍 Python Code (e.g., .py files, if applicable)\n\n"
+    "Once your documents have been *processed* or if you have no materials to upload, press the *🔍 Query* button below to proceed with your questions or requests."
+)
+
+teach_contextual_info_message = (
+    "Please send any relevant information about the lecture materials, concepts, or topic by replying to this message.\n\n"
+    "You can upload a file in one of the following formats:\n"
+    "📄 PDF (e.g., .pdf)\n"
+    "📜 Text (e.g., .txt or plain text in this chat)\n"
+    "🐍 Python Code (e.g., .py files, if applicable)\n\n"
+    "Once your documents have been processed or if you have no materials to upload, press the 🔍 Query button below to proceed with your questions or requests."
+)
+
+teach_query_message_bold = (
+    "What queries do you have? Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
+    "❓ Do you have questions about the lecture materials or concepts?\n"
+    "🔍 Do you need clarification on a specific topic covered in the lecture?\n"
+    "💡 Are there any knowledge gaps you'd like to address?\n\n"
+    "Please type your query below by *replying to this message*, and I'll do my best to help!"
+)
+
+teach_query_message = (
+    "What queries do you have? Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
+    "❓ Do you have questions about the lecture materials or concepts?\n"
+    "🔍 Do you need clarification on a specific topic covered in the lecture?\n"
+    "💡 Are there any knowledge gaps you'd like to address?\n\n"
+    "Please type your query below by replying to this message, and I'll do my best to help!"
+)
+
+first_feedback_message = (
+    "This response has never been *seen/generated by a user* before. "
+    "If it was helpful, *click 👍*. If not, *click 👎*. "
+    "Your feedback helps us improve!"
 )
 
 # Set command menu
@@ -125,6 +167,7 @@ async def set_command_menu(bot):
         BotCommand("sitrep", "Get updates about the lab group (for teachers only)"),
         BotCommand("export", "Export chat history (for teachers only)"),
     ]
+
     await bot.set_my_commands(commands)
 
 # Handler for /start command to authenticate users
@@ -255,198 +298,198 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-# Handler for receiving messages and logging chat history
-async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# # Handler for receiving messages and logging chat history
+# async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    user_id = update.effective_chat.id
-    telegram_handle = update.effective_user.username
+#     user_id = update.effective_chat.id
+#     telegram_handle = update.effective_user.username
 
-    try:
-        # Retrieve user's NUSNET ID
-        nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
-    except Exception as db_error:
-        logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
-        return
+#     try:
+#         # Retrieve user's NUSNET ID
+#         nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
+#     except Exception as db_error:
+#         logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
+#         await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
+#         return
 
-    # Check if user is authenticated
-    try:
-        if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
-            await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
-            return
-    except Exception as auth_error:
-        logging.error(f"Authentication error for user {user_id}: {auth_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
-        return
+#     # Check if user is authenticated
+#     try:
+#         if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+#             await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
+#             return
+#     except Exception as auth_error:
+#         logging.error(f"Authentication error for user {user_id}: {auth_error}")
+#         await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
+#         return
     
-    recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-    metadata = f"{recent_convo}|{{message_count}}"
-    user_message = update.message.text
-    logging.info(f"Message received from user {user_id}: {user_message}")
+#     recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+#     metadata = f"{recent_convo}|{{message_count}}"
+#     user_message = update.message.text
+#     logging.info(f"Message received from user {user_id}: {user_message}")
 
-    try:
-        # Retrieve most recent conversation ID
-        most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-        conversation_id = most_recent_convo if most_recent_convo else 1
-    except Exception as convo_error:
-        logging.error(f"Error retrieving recent conversation for NUSNET ID {nusnet_id}: {convo_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your conversation history. Please try again later.")
-        return
+#     try:
+#         # Retrieve most recent conversation ID
+#         most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+#         conversation_id = most_recent_convo if most_recent_convo else 1
+#     except Exception as convo_error:
+#         logging.error(f"Error retrieving recent conversation for NUSNET ID {nusnet_id}: {convo_error}")
+#         await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your conversation history. Please try again later.")
+#         return
 
-    try:
-        # Get response from LLM
-        response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id)
-    except Exception as llm_error:
-        logging.error(f"Error generating LLM response for user {user_id}: {llm_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
-        return
+#     try:
+#         # Get response from LLM
+#         response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id)
+#     except Exception as llm_error:
+#         logging.error(f"Error generating LLM response for user {user_id}: {llm_error}")
+#         await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
+#         return
 
-    # Split the string into parts using triple backticks
-    parts = response.split("```")
+#     # Split the string into parts using triple backticks
+#     parts = response.split("```")
 
-    for i, part in enumerate(parts):
+#     for i, part in enumerate(parts):
 
-        text = part.strip()
+#         text = part.strip()
 
-        if i % 2 == 0:  # Even index: plain text
-            keyboard = [
-                [
-            InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 1)),
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+#         if i % 2 == 0:  # Even index: plain text
+#             keyboard = [
+#                 [
+#             InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 1)),
+#                 ]
+#             ]
+#             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            try:
-                await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
-            except Exception as send_error:
-                logging.error(f"Error sending part of the message: {send_error}")
-                await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
+#             try:
+#                 await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
+#             except Exception as send_error:
+#                 logging.error(f"Error sending part of the message: {send_error}")
+#                 await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
 
-        else:  # Odd index: code block
+#         else:  # Odd index: code block
 
-            keyboard = [
-                [
-            InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 1)),
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+#             keyboard = [
+#                 [
+#             InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 1)),
+#                 ]
+#             ]
+#             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            try:
-                await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
-            except Exception as send_error:
-                logging.error(f"Error sending part of the message: {send_error}")
-                await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long", reply_markup=reply_markup)
+#             try:
+#                 await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
+#             except Exception as send_error:
+#                 logging.error(f"Error sending part of the message: {send_error}")
+#                 await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long", reply_markup=reply_markup)
                 
-    logging.info(f"Message sent to user {user_id}: {response}")
+#     logging.info(f"Message sent to user {user_id}: {response}")
 
 
-# Handler for receiving document and logging chat hist
-async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        user_id = update.effective_chat.id
-        nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
-        telegram_handle = update.effective_user.username
+# # Handler for receiving document and logging chat hist
+# async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     try:
+#         user_id = update.effective_chat.id
+#         nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
+#         telegram_handle = update.effective_user.username
 
-        # Check if user is authenticated
-        if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
-            await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
-            return
+#         # Check if user is authenticated
+#         if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+#             await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
+#             return
 
-        document = update.message.document
-        recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-        metadata = f"{recent_convo}|{{message_count}}"
+#         document = update.message.document
+#         recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+#         metadata = f"{recent_convo}|{{message_count}}"
 
-        if not document:
-            await context.bot.send_message(chat_id=user_id, text="No document found in the message.")
-            return
+#         if not document:
+#             await context.bot.send_message(chat_id=user_id, text="No document found in the message.")
+#             return
 
-        caption = update.message.caption
+#         caption = update.message.caption
 
-        file_name = document.file_name
-        file_size = document.file_size
+#         file_name = document.file_name
+#         file_size = document.file_size
 
-        # Log the received document details
-        logging.info(f"Document received: {file_name}, size: {file_size} bytes")
+#         # Log the received document details
+#         logging.info(f"Document received: {file_name}, size: {file_size} bytes")
 
-        # Download the document
-        try:
-            file = await update.message.effective_attachment.get_file()
-            file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
-            logging.info(f"File downloaded: {file_path}")
-        except Exception as e:
-            logging.error(f"Error downloading file: {e}")
-            await context.bot.send_message(chat_id=user_id, text="Failed to download the document. Please try again.")
-            return
+#         # Download the document
+#         try:
+#             file = await update.message.effective_attachment.get_file()
+#             file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
+#             logging.info(f"File downloaded: {file_path}")
+#         except Exception as e:
+#             logging.error(f"Error downloading file: {e}")
+#             await context.bot.send_message(chat_id=user_id, text="Failed to download the document. Please try again.")
+#             return
 
-        # Extract file type
-        try:
-            _, file_extension = os.path.splitext(file_path)
-            file_type = file_extension.lstrip(".").upper()
-        except Exception as e:
-            logging.error(f"Error extracting file type: {e}")
-            await context.bot.send_message(chat_id=user_id, text="Failed to determine the file type. Please check the file and try again.")
-            return
+#         # Extract file type
+#         try:
+#             _, file_extension = os.path.splitext(file_path)
+#             file_type = file_extension.lstrip(".").upper()
+#         except Exception as e:
+#             logging.error(f"Error extracting file type: {e}")
+#             await context.bot.send_message(chat_id=user_id, text="Failed to determine the file type. Please check the file and try again.")
+#             return
 
-        # Process the document
-        try:
-            await llm.load_document(file_path=file_path, nusnet_id=nusnet_id, file_type=file_type)
-            await context.bot.send_message(chat_id=user_id, text=f"{file_type} document successfully processed: {file_name}")
-        except Exception as e:
-            logging.error(f"Error processing document: {e}")
-            await context.bot.send_message(chat_id=user_id, text="Failed to process the document. Please try again later.")
-            return
+#         # Process the document
+#         try:
+#             await llm.load_document(file_path=file_path, nusnet_id=nusnet_id, file_type=file_type)
+#             await context.bot.send_message(chat_id=user_id, text=f"{file_type} document successfully processed: {file_name}")
+#         except Exception as e:
+#             logging.error(f"Error processing document: {e}")
+#             await context.bot.send_message(chat_id=user_id, text="Failed to process the document. Please try again later.")
+#             return
 
-        # Handle caption if provided
-        if caption:
-            try:
-                most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-                conversation_id = most_recent_convo if most_recent_convo else 1
-                response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
+#         # Handle caption if provided
+#         if caption:
+#             try:
+#                 most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
+#                 conversation_id = most_recent_convo if most_recent_convo else 1
+#                 response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
 
-                # Split the string into parts using triple backticks
-                parts = response.split("```")
+#                 # Split the string into parts using triple backticks
+#                 parts = response.split("```")
 
-                for i, part in enumerate(parts):
+#                 for i, part in enumerate(parts):
 
-                    text = part.strip()
+#                     text = part.strip()
 
-                    if i % 2 == 0:  # Even index: plain text
+#                     if i % 2 == 0:  # Even index: plain text
 
-                        keyboard = [
-                            [
-                        InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 2)),
-                            ]
-                        ]
-                        reply_markup = InlineKeyboardMarkup(keyboard)
+#                         keyboard = [
+#                             [
+#                         InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 2)),
+#                             ]
+#                         ]
+#                         reply_markup = InlineKeyboardMarkup(keyboard)
 
-                        try:
-                            await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
-                        except Exception as send_error:
-                            logging.error(f"Error sending part of the message: {send_error}")
-                            await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
+#                         try:
+#                             await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
+#                         except Exception as send_error:
+#                             logging.error(f"Error sending part of the message: {send_error}")
+#                             await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
 
-                    else:  # Odd index: code block
+#                     else:  # Odd index: code block
 
-                        keyboard = [
-                            [
-                        InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 2)),
-                            ]
-                        ]
-                        reply_markup = InlineKeyboardMarkup(keyboard)
+#                         keyboard = [
+#                             [
+#                         InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 2)),
+#                             ]
+#                         ]
+#                         reply_markup = InlineKeyboardMarkup(keyboard)
 
-                        try:
-                            await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
-                        except Exception as send_error:
-                            logging.error(f"Error sending part of the message: {send_error}")
-                            await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long", reply_markup=reply_markup)
+#                         try:
+#                             await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
+#                         except Exception as send_error:
+#                             logging.error(f"Error sending part of the message: {send_error}")
+#                             await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long", reply_markup=reply_markup)
 
-            except Exception as e:
-                logging.error(f"Error handling caption response: {e}")
-                await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your caption. Please try again.")
+#             except Exception as e:
+#                 logging.error(f"Error handling caption response: {e}")
+#                 await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your caption. Please try again.")
 
-    except Exception as e:
-        logging.error(f"Unexpected error in document handler: {e}")
-        await context.bot.send_message(chat_id=user_id, text="An unexpected error occurred. Please try again later.")
+#     except Exception as e:
+#         logging.error(f"Unexpected error in document handler: {e}")
+#         await context.bot.send_message(chat_id=user_id, text="An unexpected error occurred. Please try again later.")
 
 # Handler for sitrep of lab group
 async def sitrep(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -527,6 +570,27 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Start a new conversation
             chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
             logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
+
+            context.user_data.clear()
+            context.user_data['category'] = 'teach' # Storing metadata of user's intention
+
+            keyboard = [
+                    [
+                    InlineKeyboardButton("🔍 Query", callback_data="query_teach"),
+                    ]
+                ]
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Send a message forcing the user to reply
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=teach_contextual_info_message_bold,
+                reply_markup=reply_markup, # ForceReply(selective=True),  # Forces the reply
+                parse_mode="Markdown"
+            )
+            return
+
         
         case "category_guide":
             # Start a new conversation
@@ -543,7 +607,47 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=ForceReply(selective=True),  # Forces the reply
                 parse_mode="Markdown"
             )
+            return
+        
+        case "query_teach":
+            # Send a message forcing the user to reply
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=teach_query_message_bold ,
+                reply_markup=ForceReply(selective=True),  # Forces the reply
+                parse_mode="Markdown"
+                )
+            return
 
+        case "query_guide":
+            # Send a message forcing the user to reply
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=guidance_query_message_bold ,
+                reply_markup=ForceReply(selective=True),  # Forces the reply
+                parse_mode="Markdown"
+                )
+            return
+        
+        case _:
+            
+            sentiment = metadata_parts[0]
+            cat = metadata_parts[1]
+            object_id = metadata_parts[2]
+
+            match cat:
+
+                case "teach":
+                    prompt, response = chat_db.get_callback_data_teach(object_id)
+                    chat_db.input_feedback_teach(nusnet_id=nusnet_id, prompt=prompt, response=response, sentiment=sentiment)
+                    return
+
+                case "guide":
+                    prompt, response, assignment = chat_db.get_callback_data_guide(object_id)
+                    chat_db.input_feedback_guide(nusnet_id=nusnet_id, prompt=prompt, response=response, assignment=assignment, sentiment=sentiment)
+                    return
+                
+            return
 
 
     # convo_id = int(metadata_parts[0])
@@ -661,15 +765,23 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             context.user_data['assignment'] = assignment_name
 
+            keyboard = [
+                    [
+                    InlineKeyboardButton("🔍 Query", callback_data="query_guide"),
+                    ]
+                ]
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
             # Send a message forcing the user to reply
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=contextual_info_message_bold,
-                reply_markup=ForceReply(selective=True),
+                text=guidance_contextual_info_message_bold,
+                reply_markup=reply_markup,# ForceReply(selective=True),
                 parse_mode="Markdown"
             )
 
-        case original_question if original_question == contextual_info_message:
+        case original_question if original_question == guidance_contextual_info_message or original_question == teach_contextual_info_message:
 
             # Initialize a list in context.user_data to store file metadata
             if 'documents' not in context.user_data:
@@ -677,12 +789,12 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if user_reply:
                 logging.info(f"User reply: {user_reply}")
-                context.user_data['documents'].append({"User Context": user_reply})
+                context.user_data['documents'].append(f"User Context:\n{user_reply}\n\n")
                 await context.bot.send_message(chat_id=user_id, text="Relevant information processed.")
 
             if update.message.caption:
                 logging.info(f"User reply: {update.message.caption}")
-                context.user_data['documents'].append({"User Context": update.message.caption})
+                context.user_data['documents'].append(f"User Context:\n{update.message.caption}\n\n")
                 await context.bot.send_message(chat_id=user_id, text="Relevant information processed.")
 
             if update.message.document:
@@ -718,7 +830,7 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     text = docs_process.load_document(file_path=file_path, file_type=file_type)
                     logging.info(f"{file_name}: {text}")
-                    context.user_data['documents'].append(f'{file_name}:\ntext\n\n')
+                    context.user_data['documents'].append(f'{file_name}:\n{text}\n\n')
                     await context.bot.send_message(chat_id=user_id, text=f"Document successfully processed: {file_name}")
                 except Exception as e:
                     logging.error(f"Error processing document: {e}")
@@ -732,7 +844,7 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             except Exception as e:
                                 logging.error(f"Error removing file: {file_path}. {e}")
 
-        case original_question if original_question == guidance_query_message:
+        case original_question if original_question == guidance_query_message or original_question == teach_query_message:
 
             user_id = update.effective_chat.id
             telegram_handle = update.effective_user.username
@@ -744,16 +856,13 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
                 await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
                 return
-    
-            recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-            metadata = f"{recent_convo}|{{message_count}}"
+            
             user_message = update.message.text
             logging.info(f"from user {user_id}: {user_message}")
 
             try:
                 # Retrieve most recent conversation ID
-                most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-                conversation_id = most_recent_convo if most_recent_convo else 1
+                conversation_id = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
             except Exception as convo_error:
                 logging.error(f"Error retrieving recent conversation for NUSNET ID {nusnet_id}: {convo_error}")
                 await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your conversation history. Please try again later.")
@@ -763,7 +872,9 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Get response from LLM
                 user_context = "".join(context.user_data['documents']) if "documents" in context.user_data else ""
                 response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id, 
-                                                      intention = context.user_data['category'], user_context = user_context )
+                                                      intention = context.user_data['category'], user_context = user_context)
+                
+
             except Exception as llm_error:
                 logging.error(f"Error generating LLM response for user {user_id}: {llm_error}")
                 await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
@@ -777,35 +888,54 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text = part.strip()
 
                 if i % 2 == 0:  # Even index: plain text
-                    keyboard = [
-                        [
-                    InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 1)),
-                        ]
-                    ]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
 
                     try:
-                        await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
+                        await context.bot.send_message(chat_id=user_id, text=text, parse_mode="Markdown")
                     except Exception as send_error:
                         logging.error(f"Error sending part of the message: {send_error}")
-                        await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
+                        await context.bot.send_message(chat_id=user_id, text="Error: Message is too long")
 
                 else:  # Odd index: code block
 
-                    keyboard = [
-                        [
-                    InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 1)),
-                        ]
-                    ]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-
                     try:
-                        await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
+                        await context.bot.send_message(chat_id=user_id, text=f"```{text}```", parse_mode="Markdown")
                     except Exception as send_error:
                         logging.error(f"Error sending part of the message: {send_error}")
-                        await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long", reply_markup=reply_markup)
+                        await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long")
                         
             logging.info(f"Message sent to user {user_id}: {response}")
+
+            if "assignment" in context.user_data:
+                object_id = chat_db.input_callback_data(
+                                                        prompt=user_message,
+                                                        response=response,
+                                                        assignment=context.user_data['assignment']
+                                                        )
+
+            else:
+                object_id = chat_db.input_callback_data(
+                                                        prompt=user_message,
+                                                        response=response,
+                                                        )
+                
+            metadata = f"{{sentiment}}|{context.user_data['category']}|{object_id}"
+
+            keyboard = [
+                    [
+                    InlineKeyboardButton("👍", callback_data=metadata.format(sentiment='like')),
+                    InlineKeyboardButton("👎", callback_data=metadata.format(sentiment = 'dislike')),
+                    ]
+                ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Send a message forcing the user to reply
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=first_feedback_message,
+                reply_markup=reply_markup,  # Forces the reply
+                parse_mode="Markdown"
+            )
 
 
 
@@ -847,7 +977,13 @@ async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
 
     elif context.user_data['category'] == 'teach':
-
+        # Send a message forcing the user to reply
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=teach_query_message_bold ,
+            reply_markup=ForceReply(selective=True),  # Forces the reply
+            parse_mode="Markdown"
+            )
         return
 
 
@@ -872,7 +1008,7 @@ async def main():
     sitrep_handler = CommandHandler("sitrep", sitrep)
     # message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), message)
     # document_handler = MessageHandler(filters.ATTACHMENT & (~filters.COMMAND), handle_documents)
-    query_handler = CommandHandler("query", handle_query)
+    # query_handler = CommandHandler("query", handle_query)
     reaction_handler = CallbackQueryHandler(handle_reactions)
     export_handler = CommandHandler("export", export)
 
@@ -888,7 +1024,7 @@ async def main():
     # application.add_handler(document_handler)
     application.add_handler(reaction_handler)
     application.add_handler(export_handler)
-    application.add_handler(query_handler)
+    #application.add_handler(query_handler)
 
     # Set menu commands
     await set_command_menu(application.bot)

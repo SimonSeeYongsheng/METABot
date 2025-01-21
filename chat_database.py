@@ -8,12 +8,14 @@ from pymongo import MongoClient
 from datetime import datetime
 from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
 import csv
+from bson.objectid import ObjectId
+import json
 
 
 load_dotenv() # Load environment variables from .env file
 
 class Chat_DB:
-    def __init__(self, MONGO_URI: str = None, database_name: str = None, users_collection_name: str = None, chat_collection_name: str = None, feedback_collection_name: str = None):
+    def __init__(self, MONGO_URI: str = None, database_name: str = None, users_collection_name: str = None, chat_collection_name: str = None):
 
         if MONGO_URI == None:
             self.MONGO_URI = os.environ.get('MONGO_URI')
@@ -23,16 +25,19 @@ class Chat_DB:
             self.users_collection_name = 'users'
         if chat_collection_name == None:
             self.chat_collection_name = 'chat_history'
-        if feedback_collection_name == None:
-            self.feedback_collection_name = 'llm_wrong_responses'
-        
+   
+        self.callback_collection_name = 'callback_collection'
+        self.guide_responses_collection_name = "guide_responses"
+        self.teach_responses_collection_name = "teach_responses"
 
         # MongoDB connection setup
         self.client = MongoClient(self.MONGO_URI)
         self.db = self.client[self.database_name] # The name of the database
         self.users_collection = self.db[self.users_collection_name] # Collection to store user details
         self.chat_collection = self.db[self.chat_collection_name] # Collection to store chat history
-        self.feedback_collection = self.db[self.feedback_collection_name] # Collection to store chat history
+        self.callback_collection = self.db[self.callback_collection_name] # Collection to store callback data
+        self.guide_responses_collection = self.db[self.guide_responses_collection_name] # Collection to store guide responses
+        self.teach_responses_collection = self.db[self.teach_responses_collection_name] # Collection to store teach responses
 
     # Helper function to check if a user is authenticated
     def is_user_authenticated(self, user_id: str,telegram_handle: str):
@@ -100,8 +105,31 @@ class Chat_DB:
             return recent_conversation[0].get("SessionId").get("conversation_id")
         
         # If no conversation is found, return None
-        return None
+        return 1
     
+    def get_callback_data_teach(self, object_id: str):
+
+        object_id = ObjectId(object_id)
+
+        # Query the document by _id
+        document = self.callback_collection.find_one({"_id": object_id})
+        prompt = document.get("prompt")
+        response = document.get("response")
+ 
+        return [prompt, response]
+    
+    def get_callback_data_guide(self, object_id: str):
+
+        object_id = ObjectId(object_id)
+
+        # Query the document by _id
+        document = self.callback_collection.find_one({"_id": object_id})
+        prompt = document.get("prompt")
+        response = document.get("response")
+        assignment = document.get("assignment")
+ 
+        return [prompt, response, assignment]
+        
     def get_all_conversation(self, nusnet_id: str):
 
         messages = []
@@ -116,8 +144,7 @@ class Chat_DB:
     
     def start_new_conversation(self, message: str, nusnet_id: str):
 
-        conversation_id = self.get_recent_conversation(nusnet_id)
-        conversation_id = (conversation_id + 1) if conversation_id else 1
+        conversation_id = self.get_recent_conversation(nusnet_id) + 1
 
         chat_session_history = MongoDBChatMessageHistory(
                 session_id={"nusnet_id": nusnet_id, "conversation_id": conversation_id},
@@ -131,14 +158,215 @@ class Chat_DB:
     def get_all_nusnet_ids(self):
         return self.users_collection.distinct("nusnet_id")
     
-    def input_feedback(self, nusnet_id: str, conversation_id: str, message: str, prompt: str):
+    def input_callback_data(self, prompt: str, response: str, assignment: str = None):
 
-        self.feedback_collection.insert_one({
-            'nusnet_id' : nusnet_id,
-            'conversation_id': conversation_id,
-            'user_prompt' : prompt,
-            'llm_wrong_response': message
-        })
+        if assignment:
+
+            document = self.callback_collection.insert_one({
+                "prompt" : prompt,
+                "response" : response,
+                "assignment" : assignment
+            })
+        
+        else:
+
+            document = self.callback_collection.insert_one({
+                "prompt" : prompt,
+                "response" : response,
+
+            })
+    
+        return str(document.inserted_id)
+    
+    def input_feedback_teach(self, nusnet_id: str, prompt : str, response : str,  sentiment: str):
+
+        document = self.teach_responses_collection.find_one({'prompt' : prompt})
+
+        if document:
+
+            match sentiment:
+
+                case 'like':
+
+                    if nusnet_id in document.get('like_users',[]):
+                        return
+
+                    elif nusnet_id in document.get('dislike_users',[]):
+                        self.teach_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$pull": {"dislike_users": nusnet_id},  # Remove user from 'dislike_users'
+                                "$addToSet": {"like_users": nusnet_id},  # Add user to 'like_users'
+                                "$inc": {"like": 1, "dislike": -1},  # Adjust counts
+                                "$set": {"ratio": document['like'] + 1 - (document['dislike'] - 1)}  # Update ratio
+                            }
+                        )
+                        return
+
+                    else:
+                        self.teach_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$addToSet": {"like_users": nusnet_id},  # Add user to 'like_users'
+                                "$inc": {"like": 1},  # Increment 'like' count
+                                "$set": {"ratio": document['like'] + 1 - document['dislike']}  # Update ratio
+                            }
+                        )
+                        return
+
+                case 'dislike':
+
+                    if nusnet_id in document.get('dislike_users',[]):
+                        return
+                    
+                    elif nusnet_id in document.get('like_users',[]):
+                        self.teach_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$pull": {"like_users": nusnet_id},  # Remove user from 'like_users'
+                                "$addToSet": {"dislike_users": nusnet_id},  # Add user to 'dislike_users'
+                                "$inc": {"like": -1, "dislike": 1},  # Adjust counts
+                                "$set": {"ratio": document['like'] - 1 - (document['dislike'] + 1)}  # Update ratio
+                            }
+                        )
+                        return
+
+                    else:
+                        self.teach_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$addToSet": {"dislike_users": nusnet_id},  # Add user to 'dislike_users'
+                                "$inc": {"dislike": 1},  # Increment 'dislike' count
+                                "$set": {"ratio": document['like'] - (document['dislike'] + 1)}  # Update ratio
+                            }
+                        )
+                        return
+        else:
+            match sentiment:
+
+                case 'like':
+
+                    self.teach_responses_collection.insert_one({
+                        'prompt' : prompt,
+                        'response' : response,
+                        'like' : 1,
+                        'dislike' : 0,
+                        'ratio' : 1,
+                        'like_users' : [nusnet_id],
+                        'dislike_users' : [],
+                        }
+                    )
+                    return
+                
+                case 'dislike':
+
+                    self.teach_responses_collection.insert_one({
+                        'prompt' : prompt,
+                        'response' : response,
+                        'like' : 0,
+                        'dislike' : 1,
+                        'ratio' : -1,
+                        'like_users' : [],
+                        'dislike_users' : [nusnet_id],
+                        }
+                    )
+                    return
+    
+    def input_feedback_guide(self, nusnet_id: str, prompt : str, response : str, assignment: str, sentiment: str):
+
+        document = self.guide_responses_collection.find_one({'assignment' : assignment, 'prompt' : prompt})
+
+        if document:
+
+            match sentiment:
+
+                case 'like':
+
+                    if nusnet_id in document.get('like_users',[]):
+                        return
+
+                    elif nusnet_id in document.get('dislike_users',[]):
+                        self.guide_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$pull": {"dislike_users": nusnet_id},  # Remove user from 'dislike_users'
+                                "$addToSet": {"like_users": nusnet_id},  # Add user to 'like_users'
+                                "$inc": {"like": 1, "dislike": -1},  # Adjust counts
+                                "$set": {"ratio": document['like'] + 1 - (document['dislike'] - 1)}  # Update ratio
+                            }
+                        )
+                        return
+
+                    else:
+                        self.guide_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$addToSet": {"like_users": nusnet_id},  # Add user to 'like_users'
+                                "$inc": {"like": 1},  # Increment 'like' count
+                                "$set": {"ratio": document['like'] + 1 - document['dislike']}  # Update ratio
+                            }
+                        )
+                        return
+
+                case 'dislike':
+
+                    if nusnet_id in document.get('dislike_users',[]):
+                        return
+                    
+                    elif nusnet_id in document.get('like_users',[]):
+                        self.guide_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$pull": {"like_users": nusnet_id},  # Remove user from 'like_users'
+                                "$addToSet": {"dislike_users": nusnet_id},  # Add user to 'dislike_users'
+                                "$inc": {"like": -1, "dislike": 1},  # Adjust counts
+                                "$set": {"ratio": document['like'] - 1 - (document['dislike'] + 1)}  # Update ratio
+                            }
+                        )
+                        return
+
+                    else:
+                        self.guide_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$addToSet": {"dislike_users": nusnet_id},  # Add user to 'dislike_users'
+                                "$inc": {"dislike": 1},  # Increment 'dislike' count
+                                "$set": {"ratio": document['like'] - (document['dislike'] + 1)}  # Update ratio
+                            }
+                        )
+                        return
+        else:
+            match sentiment:
+
+                case 'like':
+
+                    self.guide_responses_collection.insert_one({
+                        'assignment' : assignment,
+                        'prompt' : prompt,
+                        'response' : response,
+                        'like' : 1,
+                        'dislike' : 0,
+                        'ratio' : 1,
+                        'like_users' : [nusnet_id],
+                        'dislike_users' : [],
+                        }
+                    )
+                    return
+                
+                case 'dislike':
+
+                    self.guide_responses_collection.insert_one({
+                        'assignment' : assignment,
+                        'prompt' : prompt,
+                        'response' : response,
+                        'like' : 0,
+                        'dislike' : 1,
+                        'ratio' : -1,
+                        'like_users' : [],
+                        'dislike_users' : [nusnet_id],
+                        }
+                    )
+                    return
 
     def get_instructors(self, user_id: str):
 
