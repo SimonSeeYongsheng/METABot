@@ -115,9 +115,10 @@ class Chat_DB:
         document = self.callback_collection.find_one({"_id": object_id})
         prompt = document.get("prompt")
         response = document.get("response")
+        conversation_id = document.get("conversation_id")
         
  
-        return [prompt, response]
+        return [prompt, response, conversation_id]
     
     def get_callback_data_guide(self, object_id: str):
 
@@ -128,10 +129,36 @@ class Chat_DB:
         prompt = document.get("prompt")
         response = document.get("response")
         assignment = document.get("assignment")
+        conversation_id = document.get("conversation_id")
  
-        return [prompt, response, assignment]
+        return [prompt, response, assignment, conversation_id]
     
-    def get_saved_response_guide(self, list_object_id):
+    def get_saved_response_guide(self, object_id : str):
+
+        obj_id = ObjectId(object_id)
+
+        document = self.guide_responses_collection.find_one({"_id": obj_id})
+        response = document.get("response")
+        ratio = document.get("ratio")
+        like = document.get("like")
+        dislike = document.get("dislike")
+
+        return [response, ratio, like, dislike]
+    
+    def get_saved_response_teach(self, object_id : str):
+
+        obj_id = ObjectId(object_id)
+
+        document = self.teach_responses_collection.find_one({"_id": obj_id})
+        response = document.get("response")
+        ratio = document.get("ratio")
+        like = document.get("like")
+        dislike = document.get("dislike")
+
+        return [response, ratio, like, dislike]
+
+    
+    def get_saved_response_guide_list(self, list_object_id):
 
         best_response = None
         best_ratio = None
@@ -141,29 +168,26 @@ class Chat_DB:
 
         for object_id in list_object_id:
 
+            if type(object_id) != str:
+                continue
+            if len(object_id) != 24:
+                continue
+
             obj_id = ObjectId(object_id)
 
-            document = self.guide_responses_collection.find_one({"_id": obj_id})
-            response = document.get("response")
-            ratio = document.get("ratio")
+            response, ratio, like, dislike = self.get_saved_response_guide(object_id=obj_id)
 
-            if best_response == None and best_ratio == None:
+
+            if (best_response == None and best_ratio == None) or ratio > best_ratio:
                 best_response = response
                 best_ratio = ratio
-                best_like = document.get("like")
-                best_dislike = document.get("dislike")
-                best_object_id = object_id
-
-            elif ratio > best_ratio:
-                best_response = response
-                best_ratio = ratio
-                best_like = document.get("like")
-                best_dislike = document.get("dislike")
+                best_like = like
+                best_dislike = dislike
                 best_object_id = object_id
 
         return [best_object_id, best_response, best_like, best_dislike]
     
-    def get_saved_response_teach(self, list_object_id):
+    def get_saved_response_teach_list(self, list_object_id):
 
         best_response = None
         best_ratio = None
@@ -173,26 +197,23 @@ class Chat_DB:
 
         for object_id in list_object_id:
 
+            if type(object_id) != str:
+                continue
+            if len(object_id) != 24:
+                continue
+
             obj_id = ObjectId(object_id)
 
-            document = self.teach_responses_collection.find_one({"_id": obj_id})
-            response = document.get("response")
-            ratio = document.get("ratio")
+            response, ratio, like, dislike = self.get_saved_response_teach(object_id=obj_id)
 
-            if best_response == None and best_ratio == None:
+
+            if (best_response == None and best_ratio == None) or ratio > best_ratio:
                 best_response = response
                 best_ratio = ratio
-                best_like = document.get("like")
-                best_dislike = document.get("dislike")
+                best_like = like
+                best_dislike = dislike
                 best_object_id = object_id
 
-            elif ratio > best_ratio:
-                best_response = response
-                best_ratio = ratio
-                best_like = document.get("like")
-                best_dislike = document.get("dislike")
-                best_object_id = object_id
-                
         return [best_object_id, best_response, best_like, best_dislike]
         
     def get_all_conversation(self, nusnet_id: str):
@@ -207,6 +228,38 @@ class Chat_DB:
                 
         return messages
     
+    def add_human_message(self, message: str, nusnet_id: str):
+
+        conversation_id = self.get_recent_conversation(nusnet_id)
+
+        chat_session_history = MongoDBChatMessageHistory(
+                session_id={"nusnet_id": nusnet_id, "conversation_id": conversation_id},
+                connection_string=self.MONGO_URI,
+                database_name=self.database_name,
+                collection_name=self.chat_collection_name,
+                )
+        
+        chat_session_history.add_user_message(message=message)
+        
+        return
+    
+    def add_ai_message(self, message: str, nusnet_id: str):
+
+        conversation_id = self.get_recent_conversation(nusnet_id)
+
+        chat_session_history = MongoDBChatMessageHistory(
+                session_id={"nusnet_id": nusnet_id, "conversation_id": conversation_id},
+                connection_string=self.MONGO_URI,
+                database_name=self.database_name,
+                collection_name=self.chat_collection_name,
+                )
+        
+        chat_session_history.add_ai_message(message=message)
+        
+        return
+
+
+    
     def start_new_conversation(self, message: str, nusnet_id: str):
 
         conversation_id = self.get_recent_conversation(nusnet_id) + 1
@@ -220,29 +273,165 @@ class Chat_DB:
 
         chat_session_history.add_ai_message(message=message)
 
+        return conversation_id
+
     def get_all_nusnet_ids(self):
         return self.users_collection.distinct("nusnet_id")
-    
-    def input_callback_data(self, prompt: str, response: str, assignment: str = None):
+
+    def input_callback_data(self, prompt: str, response: str,conversation_id: int, assignment: str = None):
 
         if assignment:
 
             document = self.callback_collection.insert_one({
                 "prompt" : prompt,
                 "response" : response,
-                "assignment" : assignment
+                "assignment" : assignment,
+                "conversation_id" : conversation_id
             })
+
+            return str(document.inserted_id)
         
         else:
 
             document = self.callback_collection.insert_one({
                 "prompt" : prompt,
                 "response" : response,
+                "conversation_id" : conversation_id
 
             })
+
+            return str(document.inserted_id)
     
-        return str(document.inserted_id)
-    
+    def update_feedback_teach(self, object_id: str, sentiment: str, nusnet_id : str):
+
+        obj_id = ObjectId(object_id)
+
+        document = self.teach_responses_collection.find_one({"_id": obj_id})
+
+        match sentiment:
+
+            case 'like':
+
+                if nusnet_id in document.get('like_users',[]):
+                    return str(document.get('_id'))
+
+                elif nusnet_id in document.get('dislike_users',[]):
+                    result = self.teach_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$pull": {"dislike_users": nusnet_id},  # Remove user from 'dislike_users'
+                                "$addToSet": {"like_users": nusnet_id},  # Add user to 'like_users'
+                                "$inc": {"like": 1, "dislike": -1},  # Adjust counts
+                                "$set": {"ratio": (document['like'] + 1) / (document['like'] + document['dislike'])}  # Update ratio
+                            }
+                        )
+                    return str(result.upserted_id)
+
+                else:
+                    result = self.teach_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$addToSet": {"like_users": nusnet_id},  # Add user to 'like_users'
+                                "$inc": {"like": 1},  # Increment 'like' count
+                                "$set": {"ratio": (document['like'] + 1) / (document['like'] + document['dislike'] + 1)}  # Update ratio
+                            }
+                        )
+                    return str(result.upserted_id)
+
+            case 'dislike':
+
+                if nusnet_id in document.get('dislike_users',[]):
+                    return str(document.get('_id'))
+                    
+                elif nusnet_id in document.get('like_users',[]):
+                    result = self.teach_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$pull": {"like_users": nusnet_id},  # Remove user from 'like_users'
+                                "$addToSet": {"dislike_users": nusnet_id},  # Add user to 'dislike_users'
+                                "$inc": {"like": -1, "dislike": 1},  # Adjust counts
+                                "$set": {"ratio": (document['like'] - 1) / (document['like'] + document['dislike'])}  # Update ratio
+                            }
+                        )
+                    return str(result.upserted_id)
+
+                else:
+                    result = self.teach_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$addToSet": {"dislike_users": nusnet_id},  # Add user to 'dislike_users'
+                                "$inc": {"dislike": 1},  # Increment 'dislike' count
+                                "$set": {"ratio": document['like'] / (document['like'] + document['dislike'] + 1)}  # Update ratio
+                            }
+                        )
+                    return str(result.upserted_id)
+                
+    def update_feedback_guide(self, object_id: str, sentiment: str, nusnet_id : str):
+
+        obj_id = ObjectId(object_id)
+
+        document = self.guide_responses_collection.find_one({"_id": obj_id})
+
+        match sentiment:
+
+            case 'like':
+
+                if nusnet_id in document.get('like_users',[]):
+                    return str(document.get('_id'))
+
+                elif nusnet_id in document.get('dislike_users',[]):
+                    result = self.guide_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$pull": {"dislike_users": nusnet_id},  # Remove user from 'dislike_users'
+                                "$addToSet": {"like_users": nusnet_id},  # Add user to 'like_users'
+                                "$inc": {"like": 1, "dislike": -1},  # Adjust counts
+                                "$set": {"ratio": (document['like'] + 1) / (document['like'] + document['dislike'])}  # Update ratio
+                            }
+                        )
+                    return str(result.upserted_id)
+
+                else:
+                    result = self.guide_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$addToSet": {"like_users": nusnet_id},  # Add user to 'like_users'
+                                "$inc": {"like": 1},  # Increment 'like' count
+                                "$set": {"ratio": (document['like'] + 1) / (document['like'] + document['dislike'] + 1)}  # Update ratio
+                            }
+                        )
+                    return str(result.upserted_id)
+
+            case 'dislike':
+
+                if nusnet_id in document.get('dislike_users',[]):
+                    return str(document.get('_id'))
+                    
+                elif nusnet_id in document.get('like_users',[]):
+                    result = self.guide_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$pull": {"like_users": nusnet_id},  # Remove user from 'like_users'
+                                "$addToSet": {"dislike_users": nusnet_id},  # Add user to 'dislike_users'
+                                "$inc": {"like": -1, "dislike": 1},  # Adjust counts
+                                "$set": {"ratio": (document['like'] - 1) / (document['like'] + document['dislike'])}  # Update ratio
+                            }
+                        )
+                    return str(result.upserted_id)
+
+                else:
+                    result = self.guide_responses_collection.update_one(
+                            {'_id': document['_id']},
+                            {
+                                "$addToSet": {"dislike_users": nusnet_id},  # Add user to 'dislike_users'
+                                "$inc": {"dislike": 1},  # Increment 'dislike' count
+                                "$set": {"ratio": document['like'] / (document['like'] + document['dislike'] + 1)}  # Update ratio
+                            }
+                        )
+                    return str(result.upserted_id)
+
+
+
     def input_feedback_teach(self, nusnet_id: str, prompt : str, response : str,  sentiment: str):
 
         document = self.teach_responses_collection.find_one({'prompt' : prompt})
