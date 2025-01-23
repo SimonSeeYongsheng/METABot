@@ -75,14 +75,6 @@ class Chat_DB:
     def is_admin(self, user_id: str):
         user = self.users_collection.find_one({"user_id": user_id})
         return user.get("is_admin")
-    
-    def get_lab_group(self, user_id: str):
-        user = self.users_collection.find_one({"user_id": user_id})
-        return user.get("lab_group")
-    
-    def get_lab_students(self, lab_group: str):
-        students = self.users_collection.find({"lab_group": lab_group, "is_admin": False})
-        return students
 
     def get_by_session_id(self, nusnet_id: str, conversation_id: str) -> MongoDBChatMessageHistory:
 
@@ -104,8 +96,8 @@ class Chat_DB:
             
             return recent_conversation[0].get("SessionId").get("conversation_id")
         
-        # If no conversation is found, return None
-        return 1
+        # If no conversation is found, return 0
+        return 0
     
     def get_callback_data_teach(self, object_id: str):
 
@@ -621,16 +613,14 @@ class Chat_DB:
                         }
                     )
                     return str(result.inserted_id)
+                
+    def get_assignments(self):
 
-    def get_instructors(self, user_id: str):
+        # Get unique assignments
+        assignments = self.guide_responses_collection.distinct("assignment")
+        print("Assignment", assignments)
 
-        # Get lab group of user
-        lab_group = self.get_lab_group(user_id=user_id)
-
-        # Query the users collection for instructors of the user
-        instructors = list(map(lambda x: x.get("user_id"), self.users_collection.find({ "lab_group": lab_group, "is_admin" :True}).to_list()))
-
-        return instructors
+        return assignments
     
     def export_chat_collection_to_csv(self, file_path: str):
         # Export the entire chat collection to a CSV file.

@@ -84,7 +84,10 @@ class LLM:
     # Response to assignment classification
     async def assignment_message(self, message : str):
 
-        assignment_name = await self.assignment.get_assignment(message=message)
+        list_assignments = self.chat_database.get_assignments()
+
+        assignment_name = await self.assignment.get_assignment(message=message,
+                                                                list_assignments=list_assignments)
 
         logging.info(f"Assignment: {assignment_name}")
 
@@ -127,9 +130,9 @@ class LLM:
 
         match intention:
 
-            case "general":
-                response = await self.general.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id)
-                logging.info(f"General: {response}")
+            # case "general":
+            #     response = await self.general.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id)
+            #     logging.info(f"General: {response}")
 
             case "guide":
                 response = await self.guide.get_response(message=message, nusnet_id=nusnet_id, conversation_id=conversation_id,user_context = user_context)

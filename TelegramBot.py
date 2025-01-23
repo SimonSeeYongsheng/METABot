@@ -25,6 +25,11 @@ import docs_processor # module for processing docs
 
 from datetime import datetime
 
+import telegramify_markdown # module to convert markdown to markdownV2 response
+from telegramify_markdown.customize import markdown_symbol
+from telegramify_markdown.interpreters import BaseInterpreter, MermaidInterpreter
+from telegramify_markdown.type import ContentTypes
+
 load_dotenv() # Load environment variables from .env file
 
 TELE_BOT_TOKEN = os.environ.get('TELE_BOT_TOKEN')
@@ -60,8 +65,8 @@ start_message = (
 )
 
 new_message = (
-    "Click on your conversation category 👇🏼\n"
-    "Press /cancel if you don't want to make any confession"
+    "Click on your query category 👇🏼\n"
+    "Press /cancel if you don't want to *make a new query*"
 )
 
 unsupported_file_message = (
@@ -95,9 +100,9 @@ guidance_message = (
 
 guidance_contextual_info_message_bold = (
     "Please send any relevant information about the assignment by *replying to this message*.\n\nYou can upload a file in one of the following formats:\n"
-    "📄 PDF (e.g., .pdf)\n"
-    "📜 Text (e.g., .txt or plain text in this chat)\n"
-    "🐍 Python Code (e.g., .py files)\n\n"
+    "📄 PDF (e.g., `.pdf`)\n"
+    "📜 Text (e.g., `.txt` or `plain text` in this chat)\n"
+    "🐍 Python Code (e.g., `.py` files)\n\n"
     "Once your documents have been *processed* or if you have no documents to upload, press the *🔍 Query* button below to proceed with your questions or requests."
 )
 
@@ -110,7 +115,8 @@ guidance_contextual_info_message = (
 )
 
 guidance_query_message_bold = (
-    "What queries do you have? Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
+    "🔄 A new conversation has started! How can I assist you with your assignments today?\n\n"
+    "Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
     "❓ Do you have questions about the assignment requirements?\n"
     "📝 Are you unsure about how to approach or structure the assignment?\n"
     "💻 Are you facing issues with your code or logic?\n\n"
@@ -118,7 +124,8 @@ guidance_query_message_bold = (
 )
 
 guidance_query_message = (
-    "What queries do you have? Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
+    "🔄 A new conversation has started! How can I assist you with your assignments today?\n\n"
+    "Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
     "❓ Do you have questions about the assignment requirements?\n"
     "📝 Are you unsure about how to approach or structure the assignment?\n"
     "💻 Are you facing issues with your code or logic?\n\n"
@@ -128,9 +135,9 @@ guidance_query_message = (
 teach_contextual_info_message_bold = (
     "Please send any relevant information about the lecture materials, concepts, or topic by *replying to this message*.\n\n"
     "You can upload a file in one of the following formats:\n"
-    "📄 PDF (e.g., .pdf)\n"
-    "📜 Text (e.g., .txt or plain text in this chat)\n"
-    "🐍 Python Code (e.g., .py files, if applicable)\n\n"
+    "📄 PDF (e.g., `.pdf`)\n"
+    "📜 Text (e.g., `.txt` or `plain text` in this chat)\n"
+    "🐍 Python Code (e.g., `.py` files, if applicable)\n\n"
     "Once your documents have been *processed* or if you have no materials to upload, press the *🔍 Query* button below to proceed with your questions or requests."
 )
 
@@ -144,15 +151,18 @@ teach_contextual_info_message = (
 )
 
 teach_query_message_bold = (
-    "What queries do you have? Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
+    "🔄 *A new conversation has started!* How can I assist you today?\n\n"
+    "Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
     "❓ Do you have questions about the lecture materials or concepts?\n"
     "🔍 Do you need clarification on a specific topic covered in the lecture?\n"
     "💡 Are there any knowledge gaps you'd like to address?\n\n"
     "Please type your query below by *replying to this message*, and I'll do my best to help!"
 )
 
+
 teach_query_message = (
-    "What queries do you have? Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
+    "🔄 A new conversation has started! How can I assist you today?\n\n"
+    "Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
     "❓ Do you have questions about the lecture materials or concepts?\n"
     "🔍 Do you need clarification on a specific topic covered in the lecture?\n"
     "💡 Are there any knowledge gaps you'd like to address?\n\n"
@@ -238,7 +248,7 @@ async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await context.bot.send_message(chat_id=user_id, text=new_message, reply_markup=reply_markup)
+        await context.bot.send_message(chat_id=user_id, text=new_message, reply_markup=reply_markup, parse_mode="Markdown")
         # logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
     except Exception as start_error:
         logging.error(f"Error starting a new conversation for NUSNET ID {nusnet_id}: {start_error}")
@@ -295,7 +305,7 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         response = await llm.analyse_message(nusnet_id=user_message)
 
-        await context.bot.send_message(chat_id=user_id, text=response, parse_mode="Markdown")
+        await reply_to_query(update=update, context=context, user_id=user_id, response=response)
 
     elif user_nusnet_id == user_message and chat_db.user_exist(nusnet_id=user_message):
 
@@ -305,7 +315,7 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         response = await llm.analyse_message(nusnet_id=user_message)
 
-        await context.bot.send_message(chat_id=user_id, text=response, parse_mode="Markdown")
+        await reply_to_query(update=update, context=context, user_id=user_id, response=response)
     
     else:
 
@@ -313,34 +323,54 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def reply_to_query(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id : str, response : str):
 
-    # Split the string into parts using triple backticks
-    parts = response.split("```")
+    boxs = await telegramify_markdown.telegramify(
+        content=response,
+        interpreters_use=[BaseInterpreter(), MermaidInterpreter(session=None)],  # Render mermaid diagram
+        latex_escape=True,
+        normalize_whitespace=True,
+        max_word_count=4096  # The maximum number of words in a single message.
+    )
 
-    for i, part in enumerate(parts):
+    for item in boxs:
 
-        text = part.strip()
+        try:
+            await context.bot.send_message(chat_id=user_id, text=item.content, parse_mode="MarkdownV2")
+        except Exception as send_error:
+            logging.error(f"Error sending part of the message: {send_error}\n\nMessage : {item}")
+            await context.bot.send_message(chat_id=user_id, text="Error: Sending Message")
 
-        if i % 2 == 0:  # Even index: plain text
-
-            try:
-                await context.bot.send_message(chat_id=user_id, text=text, parse_mode="Markdown")
-            except Exception as send_error:
-                logging.error(f"Error sending part of the message: {send_error}")
-                await context.bot.send_message(chat_id=user_id, text="Error: Message is too long")
-
-        else:  # Odd index: code block
-
-            try:
-                await context.bot.send_message(chat_id=user_id, text=f"```{text}```", parse_mode="Markdown")
-            except Exception as send_error:
-                logging.error(f"Error sending part of the message: {send_error}")
-                await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long")
-                        
     logging.info(f"Message sent to user {user_id}: {response}")
+
+
+    # # Split the string into parts using triple backticks
+    # parts = response.split("```")
+
+    # for i, part in enumerate(parts):
+        
+
+    #     text = part.strip()
+
+    #     if i % 2 == 0:  # Even index: plain text
+
+    #         try:
+    #             await context.bot.send_message(chat_id=user_id, text=text, parse_mode="Markdown")
+    #         except Exception as send_error:
+    #             logging.error(f"Error sending part of the message: {send_error}")
+    #             await context.bot.send_message(chat_id=user_id, text="Error: Message is too long")
+
+    #     else:  # Odd index: code block
+
+    #         try:
+    #             await context.bot.send_message(chat_id=user_id, text=f"```{text}```", parse_mode="Markdown")
+    #         except Exception as send_error:
+    #             logging.error(f"Error sending part of the message: {send_error}")
+    #             await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long")
+                        
+    # logging.info(f"Message sent to user {user_id}: {response}")
 
 async def feedback_with_callback_new(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id : str, user_message : str, response : str, feedback_message : str):
 
-    if "assignment" in context.user_data:
+    if context.user_data['category'] == "guide":
         object_id = chat_db.input_callback_data(
                             prompt=user_message,
                             response=response,
@@ -379,7 +409,7 @@ async def feedback_with_callback_new(update: Update, context: ContextTypes.DEFAU
 async def feedback_with_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id : str, response_object_id: str,
                                 feedback_message : str, user_message : str, response : str):
     
-    if "assignment" in context.user_data:
+    if context.user_data['category'] == "guide":
         object_id = chat_db.input_callback_data(
                             prompt=user_message,
                             response=response,
@@ -609,54 +639,44 @@ async def feedback_with_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 # Handler for sitrep of lab group
 async def sitrep(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_chat.id
 
-    try:
-        # Check if the user is an admin
-        if not chat_db.is_admin(user_id=user_id):
-            logging.warning(f"Unauthorized sitrep attempt by user {user_id}.")
-            await context.bot.send_message(chat_id=user_id, text="User is unauthorised.")
-            return
-    except Exception as admin_check_error:
-        logging.error(f"Error checking admin status for user {user_id}: {admin_check_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred while checking authorization. Please try again later.")
-        return
+    user_nusnet_id = chat_db.get_nusnet_id(user_id)
 
-    try:
-        # Get the lab group associated with the user
-        lab_group = chat_db.get_lab_group(user_id=user_id)
-    except Exception as lab_group_error:
-        logging.error(f"Error retrieving lab group for user {user_id}: {lab_group_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your lab group. Please try again later.")
-        return
+    user_message = user_nusnet_id if len(context.args) == 0 else context.args[0].upper()
 
-    try:
-        # Get the list of students in the lab group
-        students = chat_db.get_lab_students(lab_group=lab_group)
-        logging.info(f"Sitrep initiated for lab group {lab_group} by user {user_id}.")
-        await context.bot.send_message(chat_id=user_id, text="Sitrep...give me a moment...")
-    except Exception as student_fetch_error:
-        logging.error(f"Error retrieving students for lab group {lab_group}: {student_fetch_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving student data. Please try again later.")
-        return
+    if chat_db.is_admin(user_id=user_id) and chat_db.user_exist(nusnet_id=user_message):
 
-    # Process each student in the lab group
-    for student in students:
-        student_nusnet_id = student["nusnet_id"]
+        logging.info(f"Sitrep: {user_message}")
+
         try:
-            # Get sitrep response for each student
-            response = await llm.sitrep_message(nusnet_id=student_nusnet_id)
-            try:
-                await context.bot.send_message(chat_id=user_id, text=response, parse_mode="Markdown")
-            except Exception as message_send_error:
-                logging.error(f"Error sending sitrep message for student {student_nusnet_id}: {message_send_error}")
-                await context.bot.send_message(chat_id=user_id, text=f"Error: Unable to send sitrep message for student {student_nusnet_id}.")
+            response = await llm.sitrep_message(nusnet_id=user_message)
+        
         except Exception as sitrep_error:
-            logging.error(f"Error generating sitrep message for student {student_nusnet_id}: {sitrep_error}")
-            await context.bot.send_message(chat_id=user_id, text=f"Error: Unable to process sitrep for student {student_nusnet_id}.")
+            logging.error(f"Error retrieving sitrep for user {user_id}: {sitrep_error}")
+            await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving sit rep. Please try again later.")
+            return
 
-    logging.info(f"Sitrep completed for lab group {lab_group}.")
+        
+        await reply_to_query(update=update, context=context, user_id=user_id, response=response)
 
+    elif user_nusnet_id == user_message and chat_db.user_exist(nusnet_id=user_message):
+
+        logging.info(f"Sitrep: {user_message}")
+
+        try:
+            response = await llm.sitrep_message(nusnet_id=user_message)
+        except Exception as sitrep_error:
+            logging.error(f"Error retrieving sitrep for user {user_id}: {sitrep_error}")
+            await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving sit rep. Please try again later.")
+            return
+
+        await reply_to_query(update=update, context=context, user_id=user_id, response=response)
+    
+    else:
+
+        await context.bot.send_message(chat_id=user_id, text="User is unauthorised")
 
 # Handler for handling reactions to chatbot response
 async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -683,13 +703,15 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     match category:
 
         case "category_teach":
-            # Start a new conversation
-            convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
-            logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
+            # # Start a new conversation
+            # convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
+            # logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
 
-            context.user_data.clear()
-            context.user_data['category'] = 'teach' # Storing metadata of user's intention
-            context.user_data['conversation_id'] = convo_id # Storing conversation id
+            # context.user_data.clear()
+            # context.user_data['category'] = 'teach' # Storing metadata of user's intention
+            # context.user_data['conversation_id'] = convo_id # Storing conversation id
+
+            context.user_data['documents'] = [] # Clear documents
 
             keyboard = [
                     [
@@ -710,13 +732,15 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         
         case "category_guide":
-            # Start a new conversation
-            convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
-            logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
+            # # Start a new conversation
+            # convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
+            # logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
 
-            context.user_data.clear()
-            context.user_data['category'] = 'guide' # Storing metadata of user's intention
-            context.user_data['conversation_id'] = convo_id # Storing conversation id
+            # context.user_data.clear()
+            # context.user_data['category'] = 'guide' # Storing metadata of user's intention
+            # context.user_data['conversation_id'] = convo_id # Storing conversation id
+
+            context.user_data['documents'] = [] # Clear documents
 
             # Send a message forcing the user to reply
             await context.bot.send_message(
@@ -728,6 +752,13 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         case "query_teach":
+            # Start a new conversation
+            convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
+            logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
+
+            context.user_data['category'] = 'teach' # Storing metadata of user's intention
+            context.user_data['conversation_id'] = convo_id # Storing conversation id
+            
             # Send a message forcing the user to reply
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
@@ -738,6 +769,13 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         case "query_guide":
+            # Start a new conversation
+            convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
+            logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
+
+            context.user_data['category'] = 'guide' # Storing metadata of user's intention
+            context.user_data['conversation_id'] = convo_id # Storing conversation id
+
             # Send a message forcing the user to reply
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
@@ -1067,7 +1105,7 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your conversation history. Please try again later.")
                 return
             
-            if "assignment" in context.user_data:
+            if context.user_data['category'] == "guide":
                 result = prompts_db.query_prompts(user_query=user_message, assignment_filter=context.user_data["assignment"])
             else:
                 result = prompts_db.query_prompts(user_query=user_message, assignment_filter=context.user_data["category"])
@@ -1161,6 +1199,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await reply_to_query(update=update, context=context, user_id=user_id, response=response)
     await feedback_with_callback_new(update=update, context=context, user_id=user_id, user_message=user_message, response=response, feedback_message=first_feedback_message)
     
+# Handler for cancel
+async def cancel(update: object, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    await context.bot.send_message(chat_id=user_id, text="No worries 😅. Please use /new to *make a new query*", parse_mode="Markdown")
+
 
 # Error handler for all general errors
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
