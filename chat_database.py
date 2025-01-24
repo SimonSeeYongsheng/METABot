@@ -642,6 +642,48 @@ class Chat_DB:
 
         except Exception as e:
             raise RuntimeError("Failed to export chat collection.") from e
+        
+    def export_teach_collection_to_csv(self, file_path: str):
+        # Export the entire chat collection to a CSV file.
+        try:
+            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                # Write header row based on the keys of the documents
+                cursor = self.teach_responses_collection.find()
+                first_doc = next(cursor, None)
+                if not first_doc:
+                    raise ValueError("No teach feedback to export.")
+                
+                headers = first_doc.keys()
+                writer.writerow(headers)
+                # Write data rows
+                writer.writerow(first_doc.values())
+                for document in cursor:
+                    writer.writerow(document.values())
+
+        except Exception as e:
+            raise RuntimeError("Failed to export teach feedback collection.") from e
+
+    def export_guide_collection_to_csv(self, file_path: str):
+        # Export the entire chat collection to a CSV file.
+        try:
+            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                # Write header row based on the keys of the documents
+                cursor = self.guide_responses_collection.find()
+                first_doc = next(cursor, None)
+                if not first_doc:
+                    raise ValueError("No guide feedback to export.")
+                
+                headers = first_doc.keys()
+                writer.writerow(headers)
+                # Write data rows
+                writer.writerow(first_doc.values())
+                for document in cursor:
+                    writer.writerow(document.values())
+
+        except Exception as e:
+            raise RuntimeError("Failed to export guide feedback collection.") from e
 
 
 

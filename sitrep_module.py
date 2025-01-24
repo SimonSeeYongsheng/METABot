@@ -34,14 +34,10 @@ class Sitrep:
 
     ### Report Guidelines:
     Begin the report with the following format:
-    ```
     *Here is a sitrep report of the chat history between {nusnet_id}, {name} and the educational chatbot as of {datetime}:*
-    ```
 
     If no chat history is available, respond with:
-    ```
     *There is no chat history available for {nusnet_id}, {name} as of {datetime}. Therefore, no sitrep report can be provided at this time.*
-    ```
 
     For each identified misconception:
     - Clearly state the **topic** (e.g., *Loops*, *Functions*, *Recursion*).
@@ -61,20 +57,6 @@ class Sitrep:
     ### Special Character Escaping in Markdown:
     - To escape special characters (`_`, `*`, `` ` ``, `[`), prepend them with `\\`.
     - Example: `_snake_\\_case_` for italic _snake_case_ or `*2*\\**2=4*` for bold *2*2=4.
-
-    ### Example Misconception Analysis:
-    **Topic**: *Loops*
-    - **Misconception**: The user believes that Python's `for` loop can modify the iterable directly within the loop.
-    - **Example from Chat History**:
-        ```
-        User: I tried modifying the list inside a `for` loop, but it didn't work.
-        ```
-    - **Explanation**: In Python, the `for` loop iterates over a copy of the iterable and does not directly modify it. To modify a list while iterating, use a different approach, such as a `while` loop or list comprehensions.
-    - **Recommendation**:
-        - Review Python's documentation on `for` loops.
-        - Practice exercises that involve modifying lists using alternative approaches.
-
-    Your role is to analyze, explain, and guide effectively. Always ensure responses are clear, concise, and formatted in **Markdown**.
     """
 )
 

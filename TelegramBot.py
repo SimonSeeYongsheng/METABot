@@ -47,21 +47,19 @@ docs_process = docs_processor.Docs_processor()
 
 supported_file_types = ["pdf", "txt", "py"]
 
-
 start_message = (
     "👋 *Welcome to METABot!*\n\n"
-    "Here’s what you can do:\n\n"
-    "📜 */start*: Open the information menu to learn more about how to use the bot.\n"
-    "🆕 */new*: Start a new conversation.\n"
-    "🗑️ */clear_docs*: Clear any uploaded documents.\n"
-    "📊 */analyse*: For students, this analyses your learning behaviour and provides personalized insights.\n"
-    "🧑‍🏫 */analyse [nusnet_id]* to view your student’s learning behaviour *(for teachers only)*.\n"
-    "📝 */sitrep*: Get updates about the lab group *(for teachers only)*.\n"
-    "📁 */export*: Export the chat history to a file *(for teachers only)*.\n\n"
-    "You can upload your learning materials, then start chatting to:\n"
-    "📚 *Teach content*: Dive into the material and learn interactively.\n"
-    "💡 *Ask for guidance*: Get help understanding concepts or solving problems.\n\n"
-    "I’m here to assist you in your learning journey! 😊"
+    "I’m here to make your learning journey awesome! Here’s what you can do:\n\n"
+    "📜 */start*: Learn more about how to use me—your friendly METABot!\n\n"
+    "🆕 */new*: Start a fresh conversation and pick a category to dive in!\n\n"
+    "📊 */analyse*: Students, get personalized insights on your learning behaviour!\n\n"
+    "🧑‍🏫 */analyse [nusnet_id]*: Instructors, view your student’s learning behaviour.\n\n"
+    "📝 */sitrep*: Students, uncover any misconceptions about the course content.\n\n"
+    "📝 */sitrep [nusnet_id]*: Instructors, see your student’s misconceptions.\n\n"
+    # "📁 */export_chat*: Save the chat history to a file *(instructors only)*.\n\n"
+    # "📂 */export_teach*: Export *Teach* category feedback to a file *(instructors only)*.\n\n"
+    # "📂 */export_guide*: Export *Guide* category feedback to a file *(instructors only)*.\n\n"
+    "✨ Ready to get started? Press /new and select a category to begin your journey. Let’s go! 🚀\n"
 )
 
 new_message = (
@@ -70,12 +68,12 @@ new_message = (
 )
 
 unsupported_file_message = (
-    "🚫 *Unsupported File Type* 🚫\n\n"
-    "The file you attached is not supported. Please send a file in one of the following formats:\n"
-    "📄 *PDF* (e.g., `.pdf`)\n"
-    "📜 *Text* (e.g., `.txt`)\n"
-    "🐍 *Python Code* (e.g., `.py`)\n\n"
-    "Alternatively, you can reply to the *instructional message* with plain text. Thank you! 🙏"
+    "🚫 *Unsupported File Type* 🚫"
+    # "The file you attached is not supported. Please send a file in one of the following formats:\n"
+    # "📄 *PDF* (e.g., `.pdf`)\n"
+    # "📜 *Text* (e.g., `.txt`)\n"
+    # "🐍 *Python Code* (e.g., `.py`)\n\n"
+    # "Alternatively, you can reply to the *instructional message* with plain text. Thank you! 🙏"
 )
 
 guidance_message_bold = (
@@ -187,10 +185,9 @@ async def set_command_menu(bot):
     commands = [
         BotCommand("start", "Open the information menu"),
         BotCommand("new", "Start a new conversation"),
-        BotCommand("clear_docs", "Clear uploaded documents"),
+        # BotCommand("clear_docs", "Clear uploaded documents"),
         BotCommand("analyse", "Analyse learning behaviour (/analyse [nusnet_id] for teachers only)"),
-        BotCommand("sitrep", "Get updates about the lab group (for teachers only)"),
-        BotCommand("export", "Export chat history (for teachers only)"),
+        BotCommand("sitrep", "Uncover any misconceptions about the course content"),
     ]
 
     await bot.set_my_commands(commands)
@@ -255,37 +252,37 @@ async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=user_id, text="An error occurred while starting a new conversation. Please try again later.")
 
 
-# Handler for /clear_documents command to clear documents in vectorstores
-async def clear_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_chat.id
-    telegram_handle = update.effective_user.username
+# # Handler for /clear_documents command to clear documents in vectorstores
+# async def clear_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     user_id = update.effective_chat.id
+#     telegram_handle = update.effective_user.username
 
-    try:
-        # Retrieve user's NUSNET ID
-        nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
-    except Exception as db_error:
-        logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
-        return
+#     try:
+#         # Retrieve user's NUSNET ID
+#         nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
+#     except Exception as db_error:
+#         logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
+#         await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
+#         return
 
-    # Check if user is authenticated
-    try:
-        if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
-            await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
-            return
-    except Exception as auth_error:
-        logging.error(f"Authentication error for user {user_id}: {auth_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
-        return
+#     # Check if user is authenticated
+#     try:
+#         if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
+#             await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
+#             return
+#     except Exception as auth_error:
+#         logging.error(f"Authentication error for user {user_id}: {auth_error}")
+#         await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
+#         return
 
-    # Attempt to clear documents
-    try:
-        llm.clear_documents(nusnet_id=nusnet_id)
-        await context.bot.send_message(chat_id=user_id, text="Documents cleared!")
-        logging.info(f"Documents cleared successfully for user {user_id} (NUSNET ID: {nusnet_id}).")
-    except Exception as clear_error:
-        logging.error(f"Error clearing documents for NUSNET ID {nusnet_id}: {clear_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred while clearing documents. Please try again later.")
+#     # Attempt to clear documents
+#     try:
+#         llm.clear_documents(nusnet_id=nusnet_id)
+#         await context.bot.send_message(chat_id=user_id, text="Documents cleared!")
+#         logging.info(f"Documents cleared successfully for user {user_id} (NUSNET ID: {nusnet_id}).")
+#     except Exception as clear_error:
+#         logging.error(f"Error clearing documents for NUSNET ID {nusnet_id}: {clear_error}")
+#         await context.bot.send_message(chat_id=user_id, text="An error occurred while clearing documents. Please try again later.")
 
 
 # Handler for /analyse command to analyse learning behaviour
@@ -650,6 +647,8 @@ async def sitrep(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         logging.info(f"Sitrep: {user_message}")
 
+        await context.bot.send_message(chat_id=user_id, text="Generating sitrep...give me a moment...")
+
         try:
             response = await llm.sitrep_message(nusnet_id=user_message)
         
@@ -664,6 +663,8 @@ async def sitrep(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif user_nusnet_id == user_message and chat_db.user_exist(nusnet_id=user_message):
 
         logging.info(f"Sitrep: {user_message}")
+
+        await context.bot.send_message(chat_id=user_id, text="Generating sitrep...give me a moment...")
 
         try:
             response = await llm.sitrep_message(nusnet_id=user_message)
@@ -924,9 +925,67 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # except Exception as send_error:
     #     logging.error(f"Error sending review and restart message to user {user_id}: {send_error}")
 
-# Handler for handling chat history export
-async def export(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Handler for handling teach feedback export
+async def export_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /export command to export the chat collection."""
+    user_id = update.effective_chat.id
+    file_path = f"feedback_teach_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+
+    try:
+        # Check if the user is an admin
+        if not chat_db.is_admin(user_id=user_id):
+            await context.bot.send_message(chat_id=user_id, text="Unauthorized access. This command is for admins only.")
+            return
+
+        # Export the chat collection to a CSV file
+        chat_db.export_teach_collection_to_csv(file_path)
+
+        # Send the file to the admin
+        with open(file_path, 'rb') as document:
+            await context.bot.send_document(chat_id=user_id, document=document)
+    except Exception as e:
+        logging.error(f"Error exporting teach feedback collection: {e}")
+        await context.bot.send_message(chat_id=user_id, text="Failed to export teach feedback collection.")
+    finally:
+        # Ensure the file is deleted after being sent
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as delete_error:
+                logging.error(f"Error deleting file {file_path}: {delete_error}")
+
+# Handler for handling guide feedback export
+async def export_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /export command to export the chat collection."""
+    user_id = update.effective_chat.id
+    file_path = f"feedback_guide_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+
+    try:
+        # Check if the user is an admin
+        if not chat_db.is_admin(user_id=user_id):
+            await context.bot.send_message(chat_id=user_id, text="Unauthorized access. This command is for admins only.")
+            return
+
+        # Export the chat collection to a CSV file
+        chat_db.export_guide_collection_to_csv(file_path)
+
+        # Send the file to the admin
+        with open(file_path, 'rb') as document:
+            await context.bot.send_document(chat_id=user_id, document=document)
+    except Exception as e:
+        logging.error(f"Error exporting guide feedback collection: {e}")
+        await context.bot.send_message(chat_id=user_id, text="Failed to export guide feedback collection.")
+    finally:
+        # Ensure the file is deleted after being sent
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as delete_error:
+                logging.error(f"Error deleting file {file_path}: {delete_error}")
+
+# Handler for handling chat history export
+async def export_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /export_chat command to export the chat collection."""
     user_id = update.effective_chat.id
     file_path = f"chat_history_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
@@ -1234,26 +1293,31 @@ async def main():
     
     start_handler = CommandHandler('start', start)
     new_convo_handler = CommandHandler('new', new)
-    clear_document_handler = CommandHandler("clear_docs", clear_docs)
+    #clear_document_handler = CommandHandler("clear_docs", clear_docs)
     analyse_handler = CommandHandler("analyse", analyse)
     sitrep_handler = CommandHandler("sitrep", sitrep)
     message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
     document_handler = MessageHandler(filters.ATTACHMENT & (~filters.COMMAND), handle_document)
     reaction_handler = CallbackQueryHandler(handle_reactions)
-    export_handler = CommandHandler("export", export)
+    export_chat_handler = CommandHandler("export_chat", export_chat)
+    export_teach_handler = CommandHandler("export_teach", export_teach)
+    export_guide_handler = CommandHandler("export_guide", export_guide)
 
     application.add_handler(MessageHandler(filters.REPLY & (~filters.COMMAND), capture_reply))  # Handles ForceReply responses
 
     application.add_handler(reaction_handler)
     application.add_handler(start_handler)
     application.add_handler(new_convo_handler)
-    application.add_handler(clear_document_handler)
+    #application.add_handler(clear_document_handler)
     application.add_handler(analyse_handler)
     application.add_handler(sitrep_handler)
     application.add_handler(message_handler)
     application.add_handler(document_handler)
     application.add_handler(reaction_handler)
-    application.add_handler(export_handler)
+    application.add_handler(export_chat_handler)
+    application.add_handler(export_teach_handler)
+    application.add_handler(export_guide_handler)
+
 
     application.add_error_handler(error_handler)
 
