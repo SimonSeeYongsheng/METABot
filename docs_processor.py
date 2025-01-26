@@ -1,8 +1,4 @@
-# importing os module for environment variables
-import os
 import PyPDF2
-
-
 import logging
 
 logging.basicConfig(

@@ -9,8 +9,6 @@ from datetime import datetime
 from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
 import csv
 from bson.objectid import ObjectId
-import json
-
 
 load_dotenv() # Load environment variables from .env file
 

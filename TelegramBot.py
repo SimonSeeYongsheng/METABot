@@ -6,10 +6,6 @@ import asyncio
 import nest_asyncio
 nest_asyncio.apply()
 
-import schedule
-import time
-import threading
-
 import logging
 from telegram import Update, BotCommand
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes
@@ -41,7 +37,7 @@ logging.basicConfig(
 )
 
 chat_db = chat_database.Chat_DB()
-prompts_db = prompts_database.Prompts_DB()
+prompts_db = prompts_database.Prompts_DB(chat_db = chat_db)
 llm = llm_module.LLM(Chat_Database=chat_db)
 docs_process = docs_processor.Docs_processor()
 
@@ -54,8 +50,8 @@ start_message = (
     "🆕 */new*: Start a fresh conversation and pick a category to dive in!\n\n"
     "📊 */analyse*: Students, get personalized insights on your learning behaviour!\n\n"
     "🧑‍🏫 */analyse [nusnet_id]*: Instructors, view your student’s learning behaviour.\n\n"
-    "📝 */sitrep*: Students, uncover any misconceptions about the course content.\n\n"
-    "📝 */sitrep [nusnet_id]*: Instructors, see your student’s misconceptions.\n\n"
+    "📝 */uncover*: Students, uncover any misconceptions about the course content.\n\n"
+    "📝 */uncover [nusnet_id]*: Instructors, see your student’s misconceptions.\n\n"
     # "📁 */export_chat*: Save the chat history to a file *(instructors only)*.\n\n"
     # "📂 */export_teach*: Export *Teach* category feedback to a file *(instructors only)*.\n\n"
     # "📂 */export_guide*: Export *Guide* category feedback to a file *(instructors only)*.\n\n"
@@ -69,11 +65,6 @@ new_message = (
 
 unsupported_file_message = (
     "🚫 *Unsupported File Type* 🚫"
-    # "The file you attached is not supported. Please send a file in one of the following formats:\n"
-    # "📄 *PDF* (e.g., `.pdf`)\n"
-    # "📜 *Text* (e.g., `.txt`)\n"
-    # "🐍 *Python Code* (e.g., `.py`)\n\n"
-    # "Alternatively, you can reply to the *instructional message* with plain text. Thank you! 🙏"
 )
 
 guidance_message_bold = (
@@ -185,9 +176,8 @@ async def set_command_menu(bot):
     commands = [
         BotCommand("start", "Open the information menu"),
         BotCommand("new", "Start a new conversation"),
-        # BotCommand("clear_docs", "Clear uploaded documents"),
-        BotCommand("analyse", "Analyse learning behaviour (/analyse [nusnet_id] for teachers only)"),
-        BotCommand("sitrep", "Uncover any misconceptions about the course content"),
+        BotCommand("analyse", "Analyse learning behaviour (/analyse [nusnet_id] for instructors only)"),
+        BotCommand("uncover", "Uncover any misconceptions about the course content (/uncover [nusnet_id] for instructors only)"),
     ]
 
     await bot.set_my_commands(commands)
@@ -235,8 +225,6 @@ async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        # Start a new conversation
-        # chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
 
         keyboard = [
             [InlineKeyboardButton("Teach 📚", callback_data="category_teach")],
@@ -246,44 +234,9 @@ async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await context.bot.send_message(chat_id=user_id, text=new_message, reply_markup=reply_markup, parse_mode="Markdown")
-        # logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
     except Exception as start_error:
         logging.error(f"Error starting a new conversation for NUSNET ID {nusnet_id}: {start_error}")
         await context.bot.send_message(chat_id=user_id, text="An error occurred while starting a new conversation. Please try again later.")
-
-
-# # Handler for /clear_documents command to clear documents in vectorstores
-# async def clear_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     user_id = update.effective_chat.id
-#     telegram_handle = update.effective_user.username
-
-#     try:
-#         # Retrieve user's NUSNET ID
-#         nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
-#     except Exception as db_error:
-#         logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
-#         await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
-#         return
-
-#     # Check if user is authenticated
-#     try:
-#         if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
-#             await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
-#             return
-#     except Exception as auth_error:
-#         logging.error(f"Authentication error for user {user_id}: {auth_error}")
-#         await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
-#         return
-
-#     # Attempt to clear documents
-#     try:
-#         llm.clear_documents(nusnet_id=nusnet_id)
-#         await context.bot.send_message(chat_id=user_id, text="Documents cleared!")
-#         logging.info(f"Documents cleared successfully for user {user_id} (NUSNET ID: {nusnet_id}).")
-#     except Exception as clear_error:
-#         logging.error(f"Error clearing documents for NUSNET ID {nusnet_id}: {clear_error}")
-#         await context.bot.send_message(chat_id=user_id, text="An error occurred while clearing documents. Please try again later.")
-
 
 # Handler for /analyse command to analyse learning behaviour
 async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -337,33 +290,6 @@ async def reply_to_query(update: Update, context: ContextTypes.DEFAULT_TYPE, use
             await context.bot.send_message(chat_id=user_id, text="Error: Sending Message")
 
     logging.info(f"Message sent to user {user_id}: {response}")
-
-
-    # # Split the string into parts using triple backticks
-    # parts = response.split("```")
-
-    # for i, part in enumerate(parts):
-        
-
-    #     text = part.strip()
-
-    #     if i % 2 == 0:  # Even index: plain text
-
-    #         try:
-    #             await context.bot.send_message(chat_id=user_id, text=text, parse_mode="Markdown")
-    #         except Exception as send_error:
-    #             logging.error(f"Error sending part of the message: {send_error}")
-    #             await context.bot.send_message(chat_id=user_id, text="Error: Message is too long")
-
-    #     else:  # Odd index: code block
-
-    #         try:
-    #             await context.bot.send_message(chat_id=user_id, text=f"```{text}```", parse_mode="Markdown")
-    #         except Exception as send_error:
-    #             logging.error(f"Error sending part of the message: {send_error}")
-    #             await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long")
-                        
-    # logging.info(f"Message sent to user {user_id}: {response}")
 
 async def feedback_with_callback_new(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id : str, user_message : str, response : str, feedback_message : str):
 
@@ -441,201 +367,8 @@ async def feedback_with_callback(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode="Markdown"
         )
 
-# # Handler for receiving messages and logging chat history
-# async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-#     user_id = update.effective_chat.id
-#     telegram_handle = update.effective_user.username
-
-#     try:
-#         # Retrieve user's NUSNET ID
-#         nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
-#     except Exception as db_error:
-#         logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
-#         await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
-#         return
-
-#     # Check if user is authenticated
-#     try:
-#         if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
-#             await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
-#             return
-#     except Exception as auth_error:
-#         logging.error(f"Authentication error for user {user_id}: {auth_error}")
-#         await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
-#         return
-    
-#     recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-#     metadata = f"{recent_convo}|{{message_count}}"
-#     user_message = update.message.text
-#     logging.info(f"Message received from user {user_id}: {user_message}")
-
-#     try:
-#         # Retrieve most recent conversation ID
-#         most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-#         conversation_id = most_recent_convo if most_recent_convo else 1
-#     except Exception as convo_error:
-#         logging.error(f"Error retrieving recent conversation for NUSNET ID {nusnet_id}: {convo_error}")
-#         await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your conversation history. Please try again later.")
-#         return
-
-#     try:
-#         # Get response from LLM
-#         response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id)
-#     except Exception as llm_error:
-#         logging.error(f"Error generating LLM response for user {user_id}: {llm_error}")
-#         await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
-#         return
-
-#     # Split the string into parts using triple backticks
-#     parts = response.split("```")
-
-#     for i, part in enumerate(parts):
-
-#         text = part.strip()
-
-#         if i % 2 == 0:  # Even index: plain text
-#             keyboard = [
-#                 [
-#             InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 1)),
-#                 ]
-#             ]
-#             reply_markup = InlineKeyboardMarkup(keyboard)
-
-#             try:
-#                 await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
-#             except Exception as send_error:
-#                 logging.error(f"Error sending part of the message: {send_error}")
-#                 await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
-
-#         else:  # Odd index: code block
-
-#             keyboard = [
-#                 [
-#             InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 1)),
-#                 ]
-#             ]
-#             reply_markup = InlineKeyboardMarkup(keyboard)
-
-#             try:
-#                 await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
-#             except Exception as send_error:
-#                 logging.error(f"Error sending part of the message: {send_error}")
-#                 await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long", reply_markup=reply_markup)
-                
-#     logging.info(f"Message sent to user {user_id}: {response}")
-
-
-# # Handler for receiving document and logging chat hist
-# async def document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     try:
-#         user_id = update.effective_chat.id
-#         nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
-#         telegram_handle = update.effective_user.username
-
-#         # Check if user is authenticated
-#         if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
-#             await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
-#             return
-
-#         document = update.message.document
-#         recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-#         metadata = f"{recent_convo}|{{message_count}}"
-
-#         if not document:
-#             await context.bot.send_message(chat_id=user_id, text="No document found in the message.")
-#             return
-
-#         caption = update.message.caption
-
-#         file_name = document.file_name
-#         file_size = document.file_size
-
-#         # Log the received document details
-#         logging.info(f"Document received: {file_name}, size: {file_size} bytes")
-
-#         # Download the document
-#         try:
-#             file = await update.message.effective_attachment.get_file()
-#             file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
-#             logging.info(f"File downloaded: {file_path}")
-#         except Exception as e:
-#             logging.error(f"Error downloading file: {e}")
-#             await context.bot.send_message(chat_id=user_id, text="Failed to download the document. Please try again.")
-#             return
-
-#         # Extract file type
-#         try:
-#             _, file_extension = os.path.splitext(file_path)
-#             file_type = file_extension.lstrip(".").upper()
-#         except Exception as e:
-#             logging.error(f"Error extracting file type: {e}")
-#             await context.bot.send_message(chat_id=user_id, text="Failed to determine the file type. Please check the file and try again.")
-#             return
-
-#         # Process the document
-#         try:
-#             await llm.load_document(file_path=file_path, nusnet_id=nusnet_id, file_type=file_type)
-#             await context.bot.send_message(chat_id=user_id, text=f"{file_type} document successfully processed: {file_name}")
-#         except Exception as e:
-#             logging.error(f"Error processing document: {e}")
-#             await context.bot.send_message(chat_id=user_id, text="Failed to process the document. Please try again later.")
-#             return
-
-#         # Handle caption if provided
-#         if caption:
-#             try:
-#                 most_recent_convo = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-#                 conversation_id = most_recent_convo if most_recent_convo else 1
-#                 response = await llm.response_message(message=caption, nusnet_id=nusnet_id, conversation_id=conversation_id)
-
-#                 # Split the string into parts using triple backticks
-#                 parts = response.split("```")
-
-#                 for i, part in enumerate(parts):
-
-#                     text = part.strip()
-
-#                     if i % 2 == 0:  # Even index: plain text
-
-#                         keyboard = [
-#                             [
-#                         InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 2)),
-#                             ]
-#                         ]
-#                         reply_markup = InlineKeyboardMarkup(keyboard)
-
-#                         try:
-#                             await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
-#                         except Exception as send_error:
-#                             logging.error(f"Error sending part of the message: {send_error}")
-#                             await context.bot.send_message(chat_id=user_id, text="Error: Message is too long", reply_markup=reply_markup)
-
-#                     else:  # Odd index: code block
-
-#                         keyboard = [
-#                             [
-#                         InlineKeyboardButton("👎", callback_data=metadata.format(message_count = i + 2)),
-#                             ]
-#                         ]
-#                         reply_markup = InlineKeyboardMarkup(keyboard)
-
-#                         try:
-#                             await context.bot.send_message(chat_id=user_id, text=f"```{text}```", reply_markup=reply_markup, parse_mode="Markdown")
-#                         except Exception as send_error:
-#                             logging.error(f"Error sending part of the message: {send_error}")
-#                             await context.bot.send_message(chat_id=user_id, text="Error: Code block is too long", reply_markup=reply_markup)
-
-#             except Exception as e:
-#                 logging.error(f"Error handling caption response: {e}")
-#                 await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your caption. Please try again.")
-
-#     except Exception as e:
-#         logging.error(f"Unexpected error in document handler: {e}")
-#         await context.bot.send_message(chat_id=user_id, text="An unexpected error occurred. Please try again later.")
-
-# Handler for sitrep of lab group
-async def sitrep(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Handler for uncovering misconceptions
+async def misconception(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
 
@@ -645,16 +378,16 @@ async def sitrep(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if chat_db.is_admin(user_id=user_id) and chat_db.user_exist(nusnet_id=user_message):
 
-        logging.info(f"Sitrep: {user_message}")
+        logging.info(f"Misconception: {user_message}")
 
-        await context.bot.send_message(chat_id=user_id, text="Generating sitrep...give me a moment...")
+        await context.bot.send_message(chat_id=user_id, text="Generating misconception report...give me a moment...")
 
         try:
-            response = await llm.sitrep_message(nusnet_id=user_message)
+            response = await llm.misconception_message(nusnet_id=user_message)
         
-        except Exception as sitrep_error:
-            logging.error(f"Error retrieving sitrep for user {user_id}: {sitrep_error}")
-            await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving sit rep. Please try again later.")
+        except Exception as misconception_error:
+            logging.error(f"Error retrieving misconception report for user {user_id}: {misconception_error}")
+            await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving smisconception report. Please try again later.")
             return
 
         
@@ -662,15 +395,15 @@ async def sitrep(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif user_nusnet_id == user_message and chat_db.user_exist(nusnet_id=user_message):
 
-        logging.info(f"Sitrep: {user_message}")
+        logging.info(f"Misconception: {user_message}")
 
-        await context.bot.send_message(chat_id=user_id, text="Generating sitrep...give me a moment...")
+        await context.bot.send_message(chat_id=user_id, text="Generating misconception report...give me a moment...")
 
         try:
-            response = await llm.sitrep_message(nusnet_id=user_message)
-        except Exception as sitrep_error:
-            logging.error(f"Error retrieving sitrep for user {user_id}: {sitrep_error}")
-            await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving sit rep. Please try again later.")
+            response = await llm.misconception_message(nusnet_id=user_message)
+        except Exception as misconception_error:
+            logging.error(f"Error retrieving misconception report for user {user_id}: {misconception_error}")
+            await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving misconception report. Please try again later.")
             return
 
         await reply_to_query(update=update, context=context, user_id=user_id, response=response)
@@ -704,13 +437,6 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     match category:
 
         case "category_teach":
-            # # Start a new conversation
-            # convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
-            # logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
-
-            # context.user_data.clear()
-            # context.user_data['category'] = 'teach' # Storing metadata of user's intention
-            # context.user_data['conversation_id'] = convo_id # Storing conversation id
 
             context.user_data['documents'] = [] # Clear documents
 
@@ -733,13 +459,6 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         
         case "category_guide":
-            # # Start a new conversation
-            # convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
-            # logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
-
-            # context.user_data.clear()
-            # context.user_data['category'] = 'guide' # Storing metadata of user's intention
-            # context.user_data['conversation_id'] = convo_id # Storing conversation id
 
             context.user_data['documents'] = [] # Clear documents
 
@@ -879,55 +598,9 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await context.bot.send_message(chat_id=user_id, text="Unable respond to the previous conversation. Please start a new conversation by sending /new.")
                     return
 
-    # convo_id = int(metadata_parts[0])
-    # user_message = int(metadata_parts[1])
-    
-
-    # try:
-    #     await context.bot.send_message(
-    #         chat_id=user_id,
-    #         text="We apologise for the error. The recent conversation will be forwarded to the TA for review. 🙏"
-    #     )
-    # except Exception as send_error:
-    #     logging.error(f"Error sending apology message to user {user_id}: {send_error}")
-
-    # try:
-    #     instructors = chat_db.get_instructors(user_id=user_id)
-    # except Exception as db_error:
-    #     logging.error(f"Error retrieving instructors for user {user_id}: {db_error}")
-    #     await context.bot.send_message(chat_id=user_id, text="An error occurred while fetching instructor information. Please try again later.")
-    #     return
-
-    # message_id = query.message.message_id
-
-    # for instructor_user_id in instructors:
-    #     try:
-    #         # Forward the most recent messages to instructors
-    #         forwarded_message = await context.bot.forward_message(
-    #             chat_id=instructor_user_id,
-    #             from_chat_id=user_id,
-    #             message_id=(message_id - user_message)
-    #         )docum
-    #         await context.bot.forward_message(
-    #             chat_id=instructor_user_id,
-    #             from_chat_id=user_id,
-    #             message_id=message_id
-    #         )
-    #     except Exception as forward_error:
-    #         logging.error(f"Error forwarding message to instructor {instructor_user_id} from user {user_id}: {forward_error}")
-        
-    # try:
-    #     prompt = forwarded_message.text if forwarded_message.text else forwarded_message.caption
-    #     chat_db.input_feedback(nusnet_id=nusnet_id, conversation_id=convo_id,message=query.message.text,prompt=prompt)
-        
-    #     await context.bot.send_message(chat_id=user_id, text="Conversation has been saved for review. 📝")
-
-    # except Exception as send_error:
-    #     logging.error(f"Error sending review and restart message to user {user_id}: {send_error}")
-
 # Handler for handling teach feedback export
 async def export_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /export command to export the chat collection."""
+    """Handle /export command to export the teach feedback collection."""
     user_id = update.effective_chat.id
     file_path = f"feedback_teach_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
@@ -937,7 +610,7 @@ async def export_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=user_id, text="Unauthorized access. This command is for admins only.")
             return
 
-        # Export the chat collection to a CSV file
+        # Export the teach feedback collection to a CSV file
         chat_db.export_teach_collection_to_csv(file_path)
 
         # Send the file to the admin
@@ -956,7 +629,7 @@ async def export_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Handler for handling guide feedback export
 async def export_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /export command to export the chat collection."""
+    """Handle /export_guide command to export the guide feedback collection."""
     user_id = update.effective_chat.id
     file_path = f"feedback_guide_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
@@ -966,7 +639,7 @@ async def export_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=user_id, text="Unauthorized access. This command is for admins only.")
             return
 
-        # Export the chat collection to a CSV file
+        # Export the guide feedback collection to a CSV file
         chat_db.export_guide_collection_to_csv(file_path)
 
         # Send the file to the admin
@@ -1011,27 +684,6 @@ async def export_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 os.remove(file_path)
             except Exception as delete_error:
                 logging.error(f"Error deleting file {file_path}: {delete_error}")
-
-
-
-
-# def clear_all_docs():
-
-#     logging.info(f"Scheduled documents clearance")
-#     doc_db.clear_all_docs()
-
-
-# def run_scheduler():
-#     # Schedule the async task
-#     schedule.every().day.at(scheduled_clear_time).do(clear_all_docs)
-#     print("Scheduler started. Waiting for tasks to execute...")
-#     while True:
-#         schedule.run_pending()
-#         time.sleep(1)
-
-
-
-
 
 # Handler to capture the user's reply
 async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1284,18 +936,13 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
 
-    # Start the scheduler in a separate thread
-    # scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-    # scheduler_thread.start()
-
     # Build the bot application
     application = ApplicationBuilder().token(TELE_BOT_TOKEN).build()
     
     start_handler = CommandHandler('start', start)
     new_convo_handler = CommandHandler('new', new)
-    #clear_document_handler = CommandHandler("clear_docs", clear_docs)
     analyse_handler = CommandHandler("analyse", analyse)
-    sitrep_handler = CommandHandler("sitrep", sitrep)
+    misconception_handler = CommandHandler("uncover", misconception)
     message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
     document_handler = MessageHandler(filters.ATTACHMENT & (~filters.COMMAND), handle_document)
     reaction_handler = CallbackQueryHandler(handle_reactions)
@@ -1308,9 +955,8 @@ async def main():
     application.add_handler(reaction_handler)
     application.add_handler(start_handler)
     application.add_handler(new_convo_handler)
-    #application.add_handler(clear_document_handler)
     application.add_handler(analyse_handler)
-    application.add_handler(sitrep_handler)
+    application.add_handler(misconception_handler)
     application.add_handler(message_handler)
     application.add_handler(document_handler)
     application.add_handler(reaction_handler)

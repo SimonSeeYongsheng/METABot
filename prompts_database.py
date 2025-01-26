@@ -7,12 +7,6 @@ from dotenv import load_dotenv, dotenv_values
 load_dotenv() # Load environment variables from .env file
 
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.document_loaders import BSHTMLLoader
-from langchain_community.document_loaders import TextLoader
-from langchain_community.document_loaders import PythonLoader
-
-from chromadb.errors import ChromaError
 from langchain_chroma import Chroma
 from uuid import uuid4
 
@@ -25,7 +19,7 @@ logging.basicConfig(
 
 class Prompts_DB:
 
-    def __init__(self, text_embedding = None,):
+    def __init__(self, chat_db, text_embedding = None):
 
         if text_embedding == None:
             self.text_embedding = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
@@ -38,6 +32,30 @@ class Prompts_DB:
                                 embedding_function=self.text_embedding,
                                 persist_directory=f"./chroma_langchain_db",  # Where to save data locally, remove if not necessary
                             )
+        
+        documents_guide = chat_db.guide_responses_collection.find()
+
+        for doc in documents_guide:
+
+            unique_id = str(uuid4())
+
+            self.vector_store.add_texts(
+                texts=[doc.get("prompt")],
+                metadatas=[{"assignment":doc.get("assignment"), "object_id": str(doc["_id"])}],
+                ids=[unique_id]
+            )
+
+        documents_teach = chat_db.teach_responses_collection.find()
+
+        for doc in documents_teach:
+
+            unique_id = str(uuid4())
+
+            self.vector_store.add_texts(
+                texts=[doc.get("prompt")],
+                metadatas=[{"assignment": "teach", "object_id": str(doc["_id"])}],
+                ids=[unique_id]
+            )
 
     def store_prompts(self, prompt: str, assignment: str, object_id: str):
 
@@ -61,8 +79,7 @@ class Prompts_DB:
             return list(map(lambda doc: doc[0].metadata.get("object_id"), results))
         else:
             return None
-        
-    # def clear_all_docs(self):
+
 
 
 

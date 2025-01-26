@@ -6,12 +6,14 @@ class Prompt_Classifier:
     def __init__(self, llm):
 
         self.llm = llm
-        self.system_prompt = """
+        self.system_prompt = (
+            """
             You are an AI designed to measure similarity between text inputs. 
             Compare the given user prompt to each prompt in the provided list and determine the most similar prompt. 
             Return only the most similar prompt from the list. If none of the prompts in the list are similar, return 'NIL' 
             with no explanation or elaboration.
             """
+        )
 
         self.prompt = ChatPromptTemplate.from_messages(
             [
