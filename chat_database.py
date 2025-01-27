@@ -151,10 +151,10 @@ class Chat_DB:
     def get_saved_response_guide_list(self, list_object_id):
 
         best_response = None
-        best_ratio = None
         best_like = None
         best_dislike = None
         best_object_id = None
+        best_score = None
 
         for object_id in list_object_id:
 
@@ -166,24 +166,42 @@ class Chat_DB:
             obj_id = ObjectId(object_id)
 
             response, ratio, like, dislike = self.get_saved_response_guide(object_id=obj_id)
+            score = ratio * like
 
 
-            if (best_response == None and best_ratio == None) or ratio > best_ratio:
+            if (best_response == None and best_score == None):
                 best_response = response
-                best_ratio = ratio
+                best_score = score
                 best_like = like
                 best_dislike = dislike
                 best_object_id = object_id
+
+            elif (score > best_score):
+                best_response = response
+                best_score = score
+                best_like = like
+                best_dislike = dislike
+                best_object_id = object_id
+
+            elif (score == best_score and like > best_like):
+                best_response = response
+                best_score = score
+                best_like = like
+                best_dislike = dislike
+                best_object_id = object_id
+                
+            else:
+                continue
 
         return [best_object_id, best_response, best_like, best_dislike]
     
     def get_saved_response_teach_list(self, list_object_id):
 
         best_response = None
-        best_ratio = None
         best_like = None
         best_dislike = None
         best_object_id = None
+        best_score = None
 
         for object_id in list_object_id:
 
@@ -195,14 +213,32 @@ class Chat_DB:
             obj_id = ObjectId(object_id)
 
             response, ratio, like, dislike = self.get_saved_response_teach(object_id=obj_id)
+            score = ratio * like
 
 
-            if (best_response == None and best_ratio == None) or ratio > best_ratio:
+            if (best_response == None and best_score == None):
                 best_response = response
-                best_ratio = ratio
+                best_score = score
                 best_like = like
                 best_dislike = dislike
                 best_object_id = object_id
+
+            elif (score > best_score):
+                best_response = response
+                best_score = score
+                best_like = like
+                best_dislike = dislike
+                best_object_id = object_id
+
+            elif (score == best_score and like > best_like):
+                best_response = response
+                best_score = score
+                best_like = like
+                best_dislike = dislike
+                best_object_id = object_id
+
+            else:
+                continue
 
         return [best_object_id, best_response, best_like, best_dislike]
         

@@ -32,6 +32,8 @@ class Prompts_DB:
                                 embedding_function=self.text_embedding,
                                 persist_directory=f"./chroma_langchain_db",  # Where to save data locally, remove if not necessary
                             )
+
+        self.vector_store.reset_collection()
         
         documents_guide = chat_db.guide_responses_collection.find()
 
