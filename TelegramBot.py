@@ -41,7 +41,7 @@ prompts_db = prompts_database.Prompts_DB(chat_db = chat_db)
 llm = llm_module.LLM(Chat_Database=chat_db)
 docs_process = docs_processor.Docs_processor()
 
-supported_file_types = ["pdf", "txt", "py"]
+supported_file_types = ["pdf", "txt", "py", "html", "js", "css", "htm"]
 
 start_message = (
     "👋 *Welcome to METABot!*\n\n"

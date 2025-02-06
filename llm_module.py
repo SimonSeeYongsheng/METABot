@@ -35,7 +35,7 @@ class LLM:
 
 
         if LLM == None:
-            self.llm = ChatOpenAI(model="gpt-4o-mini", api_key= os.environ.get('OPENAI_API_KEY'))
+            self.llm = ChatOpenAI(model="gpt-4o-mini", api_key=os.environ.get('OPENAI_API_KEY'), temperature=0)
         else:
             self.llm = LLM
 
