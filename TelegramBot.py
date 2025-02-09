@@ -37,7 +37,7 @@ logging.basicConfig(
 )
 
 chat_db = chat_database.Chat_DB()
-prompts_db = prompts_database.Prompts_DB(chat_db = chat_db)
+# prompts_db = prompts_database.Prompts_DB(chat_db = chat_db)
 llm = llm_module.LLM(Chat_Database=chat_db)
 docs_process = docs_processor.Docs_processor()
 
@@ -67,108 +67,39 @@ unsupported_file_message = (
     "🚫 *Unsupported File Type* 🚫"
 )
 
-guidance_message_bold = (
-    "Please specify the assignment you need guidance on by *replying to this message*.\n\nHere are some examples:\n"
-    "📘 Lecture 3\n"
-    "📗 Tutorial 5\n"
-    "🎯 Mission 10\n"
-    "🗺️ Sidequest 5.2\n"
-    "📙 Recitation 4\n\n"
-    "Feel free to type the exact name or number of your assignment!"
-)
-
-guidance_message = (
-    "Please specify the assignment you need guidance on by replying to this message.\n\nHere are some examples:\n"
-    "📘 Lecture 3\n"
-    "📗 Tutorial 5\n"
-    "🎯 Mission 10\n"
-    "🗺️ Sidequest 5.2\n"
-    "📙 Recitation 4\n\n"
-    "Feel free to type the exact name or number of your assignment!"
-)
-
-guidance_contextual_info_message_bold = (
-    "Please send any relevant information about the assignment by *replying to this message*.\n\nYou can upload a file in one of the following formats:\n"
+contextual_message_bold = (
+    "Please upload any *relevant documents* by *replying to this message*.\n\nYou can upload a file in one of the following formats:\n"
     "📄 PDF (e.g., `.pdf`)\n"
     "📜 Text (e.g., `.txt` or `plain text` in this chat)\n"
-    "🐍 Python Code (e.g., `.py` files)\n\n"
+    "🐍 Code (e.g., `.html`, `.js`, `.css` files)\n\n"
     "Once your documents have been *processed* or if you have no documents to upload, press the *🔍 Query* button below to proceed with your questions or requests."
 )
 
-guidance_contextual_info_message = (
-    "Please send any relevant information about the assignment by replying to this message.\n\nYou can upload a file in one of the following formats:\n"
+contextual_message = (
+    "Please upload any relevant documents by replying to this message.\n\nYou can upload a file in one of the following formats:\n"
     "📄 PDF (e.g., .pdf)\n"
     "📜 Text (e.g., .txt or plain text in this chat)\n"
-    "🐍 Python Code (e.g., .py files)\n\n"
+    "🐍 Code (e.g., .html, .js, .css files)\n\n"
     "Once your documents have been processed or if you have no documents to upload, press the 🔍 Query button below to proceed with your questions or requests."
 )
 
-guidance_query_message_bold = (
-    "🔄 A new conversation has started! How can I assist you with your assignments today?\n\n"
-    "Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
-    "❓ Do you have questions about the assignment requirements?\n"
-    "📝 Are you unsure about how to approach or structure the assignment?\n"
-    "💻 Are you facing issues with your code or logic?\n\n"
-    "Please type your query below by *replying to this message*, and I'll do my best to help!"
-)
-
-guidance_query_message = (
-    "🔄 A new conversation has started! How can I assist you with your assignments today?\n\n"
-    "Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
-    "❓ Do you have questions about the assignment requirements?\n"
-    "📝 Are you unsure about how to approach or structure the assignment?\n"
-    "💻 Are you facing issues with your code or logic?\n\n"
-    "Please type your query below by replying to this message, and I'll do my best to help!"
-)
-
-teach_contextual_info_message_bold = (
-    "Please send any relevant information about the lecture materials, concepts, or topic by *replying to this message*.\n\n"
-    "You can upload a file in one of the following formats:\n"
-    "📄 PDF (e.g., `.pdf`)\n"
-    "📜 Text (e.g., `.txt` or `plain text` in this chat)\n"
-    "🐍 Python Code (e.g., `.py` files, if applicable)\n\n"
-    "Once your documents have been *processed* or if you have no materials to upload, press the *🔍 Query* button below to proceed with your questions or requests."
-)
-
-teach_contextual_info_message = (
-    "Please send any relevant information about the lecture materials, concepts, or topic by replying to this message.\n\n"
-    "You can upload a file in one of the following formats:\n"
-    "📄 PDF (e.g., .pdf)\n"
-    "📜 Text (e.g., .txt or plain text in this chat)\n"
-    "🐍 Python Code (e.g., .py files, if applicable)\n\n"
-    "Once your documents have been processed or if you have no materials to upload, press the 🔍 Query button below to proceed with your questions or requests."
-)
-
-teach_query_message_bold = (
+query_message_bold = (
     "🔄 *A new conversation has started!* How can I assist you today?\n\n"
     "Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
     "❓ Do you have questions about the lecture materials or concepts?\n"
-    "🔍 Do you need clarification on a specific topic covered in the lecture?\n"
-    "💡 Are there any knowledge gaps you'd like to address?\n\n"
+    "📝 Are you unsure about how to approach or structure the assignment?\n"
+    "💻 Are you facing issues with your code or logic?\n\n"
     "Please type your query below by *replying to this message*, and I'll do my best to help!"
 )
 
 
-teach_query_message = (
+query_message = (
     "🔄 A new conversation has started! How can I assist you today?\n\n"
     "Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
     "❓ Do you have questions about the lecture materials or concepts?\n"
-    "🔍 Do you need clarification on a specific topic covered in the lecture?\n"
-    "💡 Are there any knowledge gaps you'd like to address?\n\n"
+    "📝 Are you unsure about how to approach or structure the assignment?\n"
+    "💻 Are you facing issues with your code or logic?\n\n"
     "Please type your query below by replying to this message, and I'll do my best to help!"
-)
-
-first_feedback_message = (
-    "This response has never been *given feedback* before.\n\n"
-    "If it was helpful, *click 👍*. If not, *click 👎*.\n\n"
-    "Your feedback helps us improve!"
-)
-
-second_feedback_message = (
-    "This response was *generated for a query similar to yours* made by another user.\n\n"
-    "It currently has *{likes} 👍 and {dislikes} 👎*.\n\n"
-    "If you find this response helpful, please *click 👍*. If not, please *click 👎*.\n\n"
-    "Your feedback helps us improve!"
 )
 
 # Set command menu
@@ -223,17 +154,26 @@ async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
         await context.bot.send_message(chat_id=user_id, text="An error occurred while starting a new conversation. Please try again later.")
         return
+    
+    context.user_data['documents'] = [] # Clear documents
 
     try:
-
         keyboard = [
-            [InlineKeyboardButton("Teach 📚", callback_data="category_teach")],
-            [InlineKeyboardButton("Guide 🧭", callback_data="category_guide")]
+            [
+            InlineKeyboardButton("🔍 Query", callback_data="query"),
+            ]
         ]
 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await context.bot.send_message(chat_id=user_id, text=new_message, reply_markup=reply_markup, parse_mode="Markdown")
+        # Send a message forcing the user to reply
+        await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=contextual_message_bold,
+                reply_markup=reply_markup,# ForceReply(selective=True),
+                parse_mode="Markdown"
+        )
+
     except Exception as start_error:
         logging.error(f"Error starting a new conversation for NUSNET ID {nusnet_id}: {start_error}")
         await context.bot.send_message(chat_id=user_id, text="An error occurred while starting a new conversation. Please try again later.")
@@ -271,6 +211,51 @@ async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(chat_id=user_id, text="User is unauthorised")
 
+async def reply_to_query_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id : str, response : str,
+                         prompt : str, conversation_id : int):
+
+    boxs = await telegramify_markdown.telegramify(
+        content=response,
+        interpreters_use=[BaseInterpreter(), MermaidInterpreter(session=None)],  # Render mermaid diagram
+        latex_escape=True,
+        normalize_whitespace=True,
+        max_word_count=4096  # The maximum number of words in a single message.
+    )
+
+    for item in boxs:
+
+        try:
+            if item != boxs[-1]:
+            
+                await context.bot.send_message(chat_id=user_id, text=item.content, parse_mode="MarkdownV2")
+            
+            else:
+
+                object_id = chat_db.input_callback_data(
+                            prompt=prompt,
+                            response=response,
+                            conversation_id=conversation_id,
+                            )
+                
+                metadata = f"{{sentiment}}|{object_id}"
+
+                keyboard = [
+                                [
+                                InlineKeyboardButton("👍", callback_data=metadata.format(sentiment='like')),
+                                InlineKeyboardButton("👎", callback_data=metadata.format(sentiment = 'dislike')),
+                                ]
+                            ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+
+                await context.bot.send_message(chat_id=user_id, text=item.content, parse_mode="MarkdownV2", reply_markup=reply_markup)
+                
+
+            
+        except Exception as send_error:
+            logging.error(f"Error sending part of the message: {send_error}\n\nMessage : {item}")
+            await context.bot.send_message(chat_id=user_id, text="Error: Sending Message")
+
 async def reply_to_query(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id : str, response : str):
 
     boxs = await telegramify_markdown.telegramify(
@@ -284,88 +269,14 @@ async def reply_to_query(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     for item in boxs:
 
         try:
-            await context.bot.send_message(chat_id=user_id, text=item.content, parse_mode="MarkdownV2")
+            
+                await context.bot.send_message(chat_id=user_id, text=item.content, parse_mode="MarkdownV2")
+            
         except Exception as send_error:
             logging.error(f"Error sending part of the message: {send_error}\n\nMessage : {item}")
             await context.bot.send_message(chat_id=user_id, text="Error: Sending Message")
 
     logging.info(f"Message sent to user {user_id}: {response}")
-
-async def feedback_with_callback_new(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id : str, user_message : str, response : str, feedback_message : str):
-
-    if context.user_data['category'] == "guide":
-        object_id = chat_db.input_callback_data(
-                            prompt=user_message,
-                            response=response,
-                            assignment=context.user_data['assignment'],
-                            conversation_id=context.user_data['conversation_id']
-
-                            )
-
-    else:
-        object_id = chat_db.input_callback_data(
-                            prompt=user_message,
-                            response=response,
-                            assignment=context.user_data['category'],
-                            conversation_id=context.user_data['conversation_id']
-                            )
-                
-    metadata = f"{{sentiment}}|{context.user_data['category']}|{object_id}"
-
-    keyboard = [
-        [
-        InlineKeyboardButton("👍", callback_data=metadata.format(sentiment='like')),
-        InlineKeyboardButton("👎", callback_data=metadata.format(sentiment = 'dislike')),
-        ]
-    ]
-            
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # Send a message forcing the user to reply
-    await context.bot.send_message(
-            chat_id=user_id,
-            text=feedback_message,
-            reply_markup=reply_markup,  # Forces the reply
-            parse_mode="Markdown"
-        )
-    
-async def feedback_with_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id : str, response_object_id: str,
-                                feedback_message : str, user_message : str, response : str):
-    
-    if context.user_data['category'] == "guide":
-        object_id = chat_db.input_callback_data(
-                            prompt=user_message,
-                            response=response,
-                            assignment=context.user_data['assignment'],
-                            conversation_id=context.user_data['conversation_id']
-                            )
-
-    else:
-        object_id = chat_db.input_callback_data(
-                            prompt=user_message,
-                            response=response,
-                            assignment=context.user_data['category'],
-                            conversation_id=context.user_data['conversation_id']
-                            )
-
-    metadata = f"{{sentiment}}|{context.user_data['category'][0]}|{object_id}|{response_object_id}"
-
-    keyboard = [
-        [
-        InlineKeyboardButton("👍", callback_data=metadata.format(sentiment='like')),
-        InlineKeyboardButton("👎", callback_data=metadata.format(sentiment = 'dislike')),
-        ]
-    ]
-            
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # Send a message forcing the user to reply
-    await context.bot.send_message(
-            chat_id=user_id,
-            text=feedback_message,
-            reply_markup=reply_markup,  # Forces the reply
-            parse_mode="Markdown"
-        )
 
 # Handler for uncovering misconceptions
 async def misconception(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -413,7 +324,7 @@ async def misconception(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=user_id, text="User is unauthorised")
 
 # Handler for handling reactions to chatbot response
-async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.message.chat.id  # Fetch user ID from the query
     callback_data = query.data  # Retrieve the callback data
@@ -435,174 +346,43 @@ async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     match category:
-
-        case "category_teach":
-
-            context.user_data['documents'] = [] # Clear documents
-
-            keyboard = [
-                    [
-                    InlineKeyboardButton("🔍 Query", callback_data="query_teach"),
-                    ]
-                ]
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            # Send a message forcing the user to reply
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=teach_contextual_info_message_bold,
-                reply_markup=reply_markup, # ForceReply(selective=True),  # Forces the reply
-                parse_mode="Markdown"
-            )
-            return
-
         
-        case "category_guide":
-
-            context.user_data['documents'] = [] # Clear documents
-
-            # Send a message forcing the user to reply
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=guidance_message_bold,
-                reply_markup=ForceReply(selective=True),  # Forces the reply
-                parse_mode="Markdown"
-            )
-            return
-        
-        case "query_teach":
+        case "query":
             # Start a new conversation
             convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
             logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
 
-            context.user_data['category'] = 'teach' # Storing metadata of user's intention
+            # context.user_data['category'] = 'teach' # Storing metadata of user's intention
             context.user_data['conversation_id'] = convo_id # Storing conversation id
             
             # Send a message forcing the user to reply
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=teach_query_message_bold ,
-                reply_markup=ForceReply(selective=True),  # Forces the reply
-                parse_mode="Markdown"
-                )
-            return
-
-        case "query_guide":
-            # Start a new conversation
-            convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
-            logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
-
-            context.user_data['category'] = 'guide' # Storing metadata of user's intention
-            context.user_data['conversation_id'] = convo_id # Storing conversation id
-
-            # Send a message forcing the user to reply
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=guidance_query_message_bold ,
+                text=query_message_bold ,
                 reply_markup=ForceReply(selective=True),  # Forces the reply
                 parse_mode="Markdown"
                 )
             return
         
-        case _:
-            
-            sentiment = metadata_parts[0]
-            cat = metadata_parts[1]
-            object_id = metadata_parts[2]
+        case "like":
+            object_id = metadata_parts[1]
+            prompt, response, conversation_id = chat_db.get_callback_data(object_id)
+            object_id = chat_db.input_feedback_data(nusnet_id=nusnet_id, prompt=prompt, response=response, 
+                                                     conversation_id=conversation_id, sentiment=category)
+            await context.bot.send_message(chat_id=user_id, text="Thank you so much for your feedback! 😊")
 
-            match cat:
-
-                case "teach":
-                    prompt, response, conversation_id = chat_db.get_callback_data_teach(object_id)
-                    object_id = chat_db.input_feedback_teach(nusnet_id=nusnet_id, prompt=prompt, response=response, sentiment=sentiment)
-                    prompts_db.store_prompts(prompt=prompt, assignment="teach", object_id=object_id)
-                    await context.bot.send_message(chat_id=user_id, text="Thank you so much for your feedback! 😊")
-                    return
-
-                case "guide":
-                    prompt, response, assignment, conversation_id = chat_db.get_callback_data_guide(object_id)
-                    object_id = chat_db.input_feedback_guide(nusnet_id=nusnet_id, prompt=prompt, response=response, assignment=assignment, sentiment=sentiment)
-                    prompts_db.store_prompts(prompt=prompt, assignment=assignment, object_id=object_id)
-                    await context.bot.send_message(chat_id=user_id, text="Thank you so much for your feedback! 😊")
-                    return
-                
-                case "t":
-                    response_object_id = metadata_parts[3]
-                    prompt, response, conversation_id = chat_db.get_callback_data_teach(object_id)
-                    chat_db.update_feedback_teach(nusnet_id=nusnet_id, sentiment=sentiment, object_id=response_object_id)
-                    await context.bot.send_message(chat_id=user_id, text="Thank you so much for your feedback! 😊")
-
-                    if sentiment == "like":
-                        return
-                    
-                    elif "conversation_id" in context.user_data:
-
-
-                        if context.user_data['conversation_id'] == conversation_id:
-
-                            try:
-                            # Get response from LLM
-                                await context.bot.send_message(chat_id=user_id, text="Generating new response for user...")
-                                user_context = "".join(context.user_data['documents']) if "documents" in context.user_data else ""
-                                response = await llm.response_message(message=prompt, nusnet_id=nusnet_id, conversation_id=conversation_id, 
-                                                                intention = context.user_data['category'], user_context = user_context)
-                            except Exception as llm_error:
-                                logging.error(f"Error generating LLM response for user {user_id}: {llm_error}")
-                                await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
-                                return
-                            
-                            await reply_to_query(update=update, context=context, user_id=user_id, response=response)
-                            await feedback_with_callback_new(update=update, context=context, user_id=user_id, user_message=prompt, 
-                                                            response=response, feedback_message=first_feedback_message)
-
-                        else:
-                            await context.bot.send_message(chat_id=user_id, text="Unable to generate response to the previous conversation. Please start a new conversation by sending /new.")
-                    
-                    else:
-                        await context.bot.send_message(chat_id=user_id, text="Unable respond to the previous conversation. Please start a new conversation by sending /new.")
-
-                    return
-
-
-                case "g":
-                    response_object_id = metadata_parts[3]
-                    prompt, response, assignment, conversation_id = chat_db.get_callback_data_guide(object_id)
-                    chat_db.update_feedback_guide(nusnet_id=nusnet_id, sentiment=sentiment, object_id=response_object_id)
-                    await context.bot.send_message(chat_id=user_id, text="Thank you so much for your feedback! 😊")
-
-                    if sentiment == "like":
-                        return
-
-                    elif "conversation_id" in context.user_data:
-                        if context.user_data['conversation_id'] == conversation_id:
-
-                            try:
-                            # Get response from LLM
-                                await context.bot.send_message(chat_id=user_id, text="Generating new response for user...")
-                                user_context = "".join(context.user_data['documents']) if "documents" in context.user_data else ""
-                                response = await llm.response_message(message=prompt, nusnet_id=nusnet_id, conversation_id=conversation_id, 
-                                                                intention = context.user_data['category'], user_context = user_context)
-                            except Exception as llm_error:
-                                logging.error(f"Error generating LLM response for user {user_id}: {llm_error}")
-                                await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
-                                return
-                            
-                            await reply_to_query(update=update, context=context, user_id=user_id, response=response)
-                            await feedback_with_callback_new(update=update, context=context, user_id=user_id, user_message=prompt, 
-                                                            response=response, feedback_message=first_feedback_message)
-                        
-                        else:
-                            await context.bot.send_message(chat_id=user_id, text="Unable respond to the previous conversation. Please start a new conversation by sending /new.")
-                    else:
-                        await context.bot.send_message(chat_id=user_id, text="Unable respond to the previous conversation. Please start a new conversation by sending /new.")
-                    return
+        case "dislike":
+            object_id = metadata_parts[1]
+            prompt, response, conversation_id = chat_db.get_callback_data(object_id)
+            object_id = chat_db.input_feedback_data(nusnet_id=nusnet_id, prompt=prompt, response=response, 
+                                                     conversation_id=conversation_id, sentiment=category)
+            await context.bot.send_message(chat_id=user_id, text="Thank you so much for your feedback! 😊")
 
 # Handler for handling teach feedback export
-async def export_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /export command to export the teach feedback collection."""
+async def export_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /export command to export the feedback collection."""
     user_id = update.effective_chat.id
-    file_path = f"feedback_teach_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+    file_path = f"feedback_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
     try:
         # Check if the user is an admin
@@ -611,43 +391,14 @@ async def export_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         # Export the teach feedback collection to a CSV file
-        chat_db.export_teach_collection_to_csv(file_path)
+        chat_db.export_feedback_collection_to_csv(file_path)
 
         # Send the file to the admin
         with open(file_path, 'rb') as document:
             await context.bot.send_document(chat_id=user_id, document=document)
     except Exception as e:
-        logging.error(f"Error exporting teach feedback collection: {e}")
-        await context.bot.send_message(chat_id=user_id, text="Failed to export teach feedback collection.")
-    finally:
-        # Ensure the file is deleted after being sent
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except Exception as delete_error:
-                logging.error(f"Error deleting file {file_path}: {delete_error}")
-
-# Handler for handling guide feedback export
-async def export_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /export_guide command to export the guide feedback collection."""
-    user_id = update.effective_chat.id
-    file_path = f"feedback_guide_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
-
-    try:
-        # Check if the user is an admin
-        if not chat_db.is_admin(user_id=user_id):
-            await context.bot.send_message(chat_id=user_id, text="Unauthorized access. This command is for admins only.")
-            return
-
-        # Export the guide feedback collection to a CSV file
-        chat_db.export_guide_collection_to_csv(file_path)
-
-        # Send the file to the admin
-        with open(file_path, 'rb') as document:
-            await context.bot.send_document(chat_id=user_id, document=document)
-    except Exception as e:
-        logging.error(f"Error exporting guide feedback collection: {e}")
-        await context.bot.send_message(chat_id=user_id, text="Failed to export guide feedback collection.")
+        logging.error(f"Error exporting feedback collection: {e}")
+        await context.bot.send_message(chat_id=user_id, text="Failed to export feedback collection.")
     finally:
         # Ensure the file is deleted after being sent
         if os.path.exists(file_path):
@@ -698,29 +449,7 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     match original_question:
 
-        case original_question if original_question == guidance_message:
-
-            assignment_name = await llm.assignment_message(user_reply)
-
-            context.user_data['assignment'] = assignment_name
-
-            keyboard = [
-                    [
-                    InlineKeyboardButton("🔍 Query", callback_data="query_guide"),
-                    ]
-                ]
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            # Send a message forcing the user to reply
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=guidance_contextual_info_message_bold,
-                reply_markup=reply_markup,# ForceReply(selective=True),
-                parse_mode="Markdown"
-            )
-
-        case original_question if original_question == guidance_contextual_info_message or original_question == teach_contextual_info_message:
+        case original_question if original_question == contextual_message:
 
             # Initialize a list in context.user_data to store file metadata
             if 'documents' not in context.user_data:
@@ -792,7 +521,7 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if update.message.photo or update.message.audio or update.message.video:
                 await context.bot.send_message(chat_id=user_id, text=unsupported_file_message, parse_mode="Markdown")
 
-        case original_question if original_question == guidance_query_message or original_question == teach_query_message:
+        case original_question if original_question == query_message:
 
             user_id = update.effective_chat.id
             # telegram_handle = update.effective_user.username
@@ -815,34 +544,17 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logging.error(f"Error retrieving recent conversation for NUSNET ID {nusnet_id}: {convo_error}")
                 await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your conversation history. Please try again later.")
                 return
-            
-            if context.user_data['category'] == "guide":
-                result = prompts_db.query_prompts(user_query=user_message, assignment_filter=context.user_data["assignment"])
-            else:
-                result = prompts_db.query_prompts(user_query=user_message, assignment_filter=context.user_data["category"])
-            
-            if result:
-                
-                if context.user_data["category"] == "teach":
-                    best_object_id, best_response, best_like, best_dislike = chat_db.get_saved_response_teach_list(result)
 
-                elif context.user_data["category"] == "guide":
-                    print("RESULT", result)
-                    best_object_id, best_response, best_like, best_dislike = chat_db.get_saved_response_guide_list(result)
-
-                await reply_to_query(update=update, context=context, user_id=user_id, response=best_response)
-                chat_db.add_human_message(message=user_message, nusnet_id=nusnet_id)
-                chat_db.add_ai_message(message=best_response, nusnet_id=nusnet_id)
-                await feedback_with_callback(update=update, context=context, user_id=user_id, response_object_id=best_object_id, 
-                                 feedback_message=second_feedback_message.format(likes=best_like, dislikes=best_dislike),
-                                 user_message=user_message, response=best_response)
             else:
 
                 try:
                     # Get response from LLM
                     user_context = "".join(context.user_data['documents']) if "documents" in context.user_data else ""
+                    print(user_context)
+                    # response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id, 
+                    #                                     intention = context.user_data['category'], user_context = user_context)
                     response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id, 
-                                                        intention = context.user_data['category'], user_context = user_context)
+                                                         user_context = user_context)
                     
 
                 except Exception as llm_error:
@@ -850,9 +562,10 @@ async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
                     return
                 
-                await reply_to_query(update=update, context=context, user_id=user_id, response=response)
+                await reply_to_query_feedback(update=update, context=context, user_id=user_id, response=response, 
+                                              prompt=user_message, conversation_id=conversation_id)
 
-                await feedback_with_callback_new(update=update, context=context, user_id=user_id, user_message=user_message, response=response, feedback_message=first_feedback_message)
+                # await feedback_with_callback_new(update=update, context=context, user_id=user_id, user_message=user_message, response=response, feedback_message=first_feedback_message)
 
 # Handler to capture the user's attachments
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -907,17 +620,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
         return
     
-    await reply_to_query(update=update, context=context, user_id=user_id, response=response)
-    await feedback_with_callback_new(update=update, context=context, user_id=user_id, user_message=user_message, response=response, feedback_message=first_feedback_message)
-    
+    await reply_to_query_feedback(update=update, context=context, user_id=user_id, response=response, 
+                                              prompt=user_message, conversation_id=conversation_id)
+
+
 # Handler for cancel
-async def cancel(update: object, context: ContextTypes.DEFAULT_TYPE):
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
     await context.bot.send_message(chat_id=user_id, text="No worries 😅. Please use /new to *make a new query*", parse_mode="Markdown")
 
 
 # Error handler for all general errors
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Log the error and send a message to the user."""
     # Log the error (optional: log to a file or monitoring system)
     logging.error(f"Update {update} caused error {context.error}")
@@ -945,24 +659,23 @@ async def main():
     misconception_handler = CommandHandler("uncover", misconception)
     message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
     document_handler = MessageHandler(filters.ATTACHMENT & (~filters.COMMAND), handle_document)
-    reaction_handler = CallbackQueryHandler(handle_reactions)
+    query_handler = CallbackQueryHandler(handle_query)
     export_chat_handler = CommandHandler("export_chat", export_chat)
-    export_teach_handler = CommandHandler("export_teach", export_teach)
-    export_guide_handler = CommandHandler("export_guide", export_guide)
+    export_feedback_handler = CommandHandler("export_feedback", export_feedback)
+
 
     application.add_handler(MessageHandler(filters.REPLY & (~filters.COMMAND), capture_reply))  # Handles ForceReply responses
 
-    application.add_handler(reaction_handler)
+    application.add_handler(query_handler)
     application.add_handler(start_handler)
     application.add_handler(new_convo_handler)
     application.add_handler(analyse_handler)
     application.add_handler(misconception_handler)
     application.add_handler(message_handler)
     application.add_handler(document_handler)
-    application.add_handler(reaction_handler)
     application.add_handler(export_chat_handler)
-    application.add_handler(export_teach_handler)
-    application.add_handler(export_guide_handler)
+    application.add_handler(export_feedback_handler)
+
 
 
     application.add_error_handler(error_handler)

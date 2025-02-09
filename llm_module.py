@@ -89,20 +89,11 @@ class LLM:
         return response
 
     # Response to text message    
-    async def response_message(self, message: str, nusnet_id : str, conversation_id: str, intention: str, user_context: str):
+    async def response_message(self, message: str, nusnet_id : str, conversation_id: str, user_context: str):
 
-        logging.info(f"Intent report: {intention}")
-
-        match intention:
-
-            case "guide":
-                response = await self.guide.get_response(message=message, nusnet_id=nusnet_id, 
-                                                         conversation_id=conversation_id,user_context = user_context)
-
-            case "teach":
-                response = await self.teach.get_response(message=message, nusnet_id=nusnet_id, 
+        response = await self.teach.get_response(message=message, nusnet_id=nusnet_id, 
                                                          conversation_id=conversation_id, user_context = user_context)
-                logging.info(f"Teaching: {response}")
+        logging.info(f"Teaching: {response}")
 
         return response
 
