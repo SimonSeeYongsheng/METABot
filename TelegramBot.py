@@ -16,7 +16,6 @@ from telegram.ext import CallbackQueryHandler
 import llm_module # module for the LLM
 
 import chat_database # module for the chat database
-import prompts_database # module for the doc database
 import docs_processor # module for processing docs
 
 from datetime import datetime
@@ -37,7 +36,6 @@ logging.basicConfig(
 )
 
 chat_db = chat_database.Chat_DB()
-# prompts_db = prompts_database.Prompts_DB(chat_db = chat_db)
 llm = llm_module.LLM(Chat_Database=chat_db)
 docs_process = docs_processor.Docs_processor()
 
@@ -58,49 +56,11 @@ start_message = (
     "✨ Ready to get started? Press /new and select a category to begin your journey. Let’s go! 🚀\n"
 )
 
-new_message = (
-    "Click on your query category 👇🏼\n"
-    "Press /cancel if you don't want to *make a new query*"
-)
 
 unsupported_file_message = (
     "🚫 *Unsupported File Type* 🚫"
 )
 
-contextual_message_bold = (
-    "Please upload any *relevant documents* by *replying to this message*.\n\nYou can upload a file in one of the following formats:\n"
-    "📄 PDF (e.g., `.pdf`)\n"
-    "📜 Text (e.g., `.txt` or `plain text` in this chat)\n"
-    "🐍 Code (e.g., `.html`, `.js`, `.css` files)\n\n"
-    "Once your documents have been *processed* or if you have no documents to upload, press the *🔍 Query* button below to proceed with your questions or requests."
-)
-
-contextual_message = (
-    "Please upload any relevant documents by replying to this message.\n\nYou can upload a file in one of the following formats:\n"
-    "📄 PDF (e.g., .pdf)\n"
-    "📜 Text (e.g., .txt or plain text in this chat)\n"
-    "🐍 Code (e.g., .html, .js, .css files)\n\n"
-    "Once your documents have been processed or if you have no documents to upload, press the 🔍 Query button below to proceed with your questions or requests."
-)
-
-query_message_bold = (
-    "🔄 *A new conversation has started!* How can I assist you today?\n\n"
-    "Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
-    "❓ Do you have questions about the lecture materials or concepts?\n"
-    "📝 Are you unsure about how to approach or structure the assignment?\n"
-    "💻 Are you facing issues with your code or logic?\n\n"
-    "Please type your query below by *replying to this message*, and I'll do my best to help!"
-)
-
-
-query_message = (
-    "🔄 A new conversation has started! How can I assist you today?\n\n"
-    "Feel free to ask anything specific so I can assist you effectively.\n\nFor example:\n"
-    "❓ Do you have questions about the lecture materials or concepts?\n"
-    "📝 Are you unsure about how to approach or structure the assignment?\n"
-    "💻 Are you facing issues with your code or logic?\n\n"
-    "Please type your query below by replying to this message, and I'll do my best to help!"
-)
 
 # Set command menu
 async def set_command_menu(bot):
@@ -156,21 +116,17 @@ async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     context.user_data['documents'] = [] # Clear documents
+    # Start a new conversation
+    convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started.")
+    logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
+    # context.user_data['conversation_id'] = convo_id # Storing conversation id
 
     try:
-        keyboard = [
-            [
-            InlineKeyboardButton("🔍 Query", callback_data="query"),
-            ]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
 
         # Send a message forcing the user to reply
         await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=contextual_message_bold,
-                reply_markup=reply_markup,# ForceReply(selective=True),
+                text="A new conversation has started.",
                 parse_mode="Markdown"
         )
 
@@ -347,23 +303,6 @@ async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     match category:
         
-        case "query":
-            # Start a new conversation
-            convo_id = chat_db.start_new_conversation(nusnet_id=nusnet_id, message="A new conversation has started")
-            logging.info(f"New conversation started for user {user_id} (NUSNET ID: {nusnet_id}).")
-
-            # context.user_data['category'] = 'teach' # Storing metadata of user's intention
-            context.user_data['conversation_id'] = convo_id # Storing conversation id
-            
-            # Send a message forcing the user to reply
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=query_message_bold ,
-                reply_markup=ForceReply(selective=True),  # Forces the reply
-                parse_mode="Markdown"
-                )
-            return
-        
         case "like":
             object_id = metadata_parts[1]
             prompt, response, conversation_id = chat_db.get_callback_data(object_id)
@@ -436,147 +375,76 @@ async def export_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as delete_error:
                 logging.error(f"Error deleting file {file_path}: {delete_error}")
 
-# Handler to capture the user's reply
-async def capture_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_chat.id
-
-    # Get the reply text and respond to the user
-    user_reply = update.message.text  # The text the user replied with
-    original_question = update.message.reply_to_message.text  # The bot's original question
-
-    logging.info(f"Reply to: {original_question}")
-
-    match original_question:
-
-        case original_question if original_question == contextual_message:
-
-            # Initialize a list in context.user_data to store file metadata
-            if 'documents' not in context.user_data:
-                context.user_data['documents'] = []
-
-            if user_reply:
-                logging.info(f"User reply: {user_reply}")
-                context.user_data['documents'].append(f"User Context:\n{user_reply}\n\n")
-                await context.bot.send_message(chat_id=user_id, text="Your plain text has been successfully processed.")
-
-            if update.message.caption:
-                logging.info(f"User reply: {update.message.caption}")
-                context.user_data['documents'].append(f"User Context:\n{update.message.caption}\n\n")
-                await context.bot.send_message(chat_id=user_id, text="Your plain text has been successfully processed.")
-
-            if update.message.document:
-
-                document = update.message.document
-
-                file_name = document.file_name
-                file_size = document.file_size
-
-                # Log the received document details
-                logging.info(f"Document received: {file_name}, size: {file_size} bytes")
-
-                # Download the document
-                try:
-                    file = await update.message.effective_attachment.get_file()
-                    file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
-                    logging.info(f"File downloaded: {file_path}")
-                except Exception as e:
-                    logging.error(f"Error downloading file: {e}")
-                    await context.bot.send_message(chat_id=user_id, text="Failed to download the document. Please try again.")
-                    return
-
-                # Extract file type
-                try:
-                    _, file_extension = os.path.splitext(file_path)
-                    file_type = file_extension.lstrip(".").lower()
-                except Exception as e:
-                    logging.error(f"Error extracting file type: {e}")
-                    await context.bot.send_message(chat_id=user_id, text="Failed to determine the file type. Please check the file and try again.")
-                    return
-                
-                # Check if file type is supported
-                if file_type not in supported_file_types:
-                    await context.bot.send_message(chat_id=user_id, text=unsupported_file_message, parse_mode="Markdown")
-
-                # Process the document
-                else:
-
-                    try:
-                        text = docs_process.load_document(file_path=file_path, file_type=file_type)
-                        logging.info(f"{file_name}: {text}")
-                        context.user_data['documents'].append(f'{file_name}:\n{text}\n\n')
-                        await context.bot.send_message(chat_id=user_id, text=f"Document successfully processed: {file_name}")
-                    except Exception as e:
-                        logging.error(f"Error processing document: {e}")
-                        await context.bot.send_message(chat_id=user_id, text="Failed to process the document. Please try again later.")
-
-                # Ensure file is removed even if an error occurs
-                if os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                        logging.info(f"Removed file: {file_path}")
-                    except Exception as e:
-                        logging.error(f"Error removing file: {file_path}. {e}")
-
-            if update.message.photo or update.message.audio or update.message.video:
-                await context.bot.send_message(chat_id=user_id, text=unsupported_file_message, parse_mode="Markdown")
-
-        case original_question if original_question == query_message:
-
-            user_id = update.effective_chat.id
-            # telegram_handle = update.effective_user.username
-
-            try:
-                # Retrieve user's NUSNET ID
-                nusnet_id = chat_db.get_nusnet_id(user_id=user_id)
-            except Exception as db_error:
-                logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
-                await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
-                return
-            
-            user_message = update.message.text
-            logging.info(f"from user {user_id}: {user_message}")
-
-            try:
-                # Retrieve most recent conversation ID
-                conversation_id = chat_db.get_recent_conversation(nusnet_id=nusnet_id)
-            except Exception as convo_error:
-                logging.error(f"Error retrieving recent conversation for NUSNET ID {nusnet_id}: {convo_error}")
-                await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your conversation history. Please try again later.")
-                return
-
-            else:
-
-                try:
-                    # Get response from LLM
-                    user_context = "".join(context.user_data['documents']) if "documents" in context.user_data else ""
-                    print(user_context)
-                    # response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id, 
-                    #                                     intention = context.user_data['category'], user_context = user_context)
-                    response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id, 
-                                                         user_context = user_context)
-                    
-
-                except Exception as llm_error:
-                    logging.error(f"Error generating LLM response for user {user_id}: {llm_error}")
-                    await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
-                    return
-                
-                await reply_to_query_feedback(update=update, context=context, user_id=user_id, response=response, 
-                                              prompt=user_message, conversation_id=conversation_id)
-
-                # await feedback_with_callback_new(update=update, context=context, user_id=user_id, user_message=user_message, response=response, feedback_message=first_feedback_message)
-
 # Handler to capture the user's attachments
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
-    await context.bot.send_message(chat_id=user_id, text="Please attach the documents *by replying to* the instructional message.", parse_mode="Markdown")
+    # Initialize a list in context.user_data to store file metadata
+    if 'documents' not in context.user_data:
+        context.user_data['documents'] = []
+
+    if update.message.document:
+
+        document = update.message.document
+
+        file_name = document.file_name
+        file_size = document.file_size
+
+        # Log the received document details
+        logging.info(f"Document received: {file_name}, size: {file_size} bytes")
+
+        # Download the document
+        try:
+            file = await update.message.effective_attachment.get_file()
+            file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
+            logging.info(f"File downloaded: {file_path}")
+        except Exception as e:
+            logging.error(f"Error downloading file: {e}")
+            await context.bot.send_message(chat_id=user_id, text="Failed to download the document. Please try again.")
+            return
+
+        # Extract file type
+        try:
+            _, file_extension = os.path.splitext(file_path)
+            file_type = file_extension.lstrip(".").lower()
+        
+        except Exception as e:
+            logging.error(f"Error extracting file type: {e}")
+            await context.bot.send_message(chat_id=user_id, text="Failed to determine the file type. Please check the file and try again.")
+            return
+                
+        # Check if file type is supported
+        if file_type not in supported_file_types:
+            await context.bot.send_message(chat_id=user_id, text=unsupported_file_message, parse_mode="Markdown")
+
+        # Process the document
+        else:
+
+            try:
+                text = docs_process.load_document(file_path=file_path, file_type=file_type)
+                logging.info(f"{file_name}: {text}")
+                context.user_data['documents'].append(f'{file_name}:\n{text}\n\n')
+                await context.bot.send_message(chat_id=user_id, text=f"Document successfully processed: {file_name}")
+            except Exception as e:
+                logging.error(f"Error processing document: {e}")
+                await context.bot.send_message(chat_id=user_id, text="Failed to process the document. Please try again later.")
+
+        # Ensure file is removed even if an error occurs
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logging.info(f"Removed file: {file_path}")
+            except Exception as e:
+                logging.error(f"Error removing file: {file_path}. {e}")
+
+        if update.message.photo or update.message.audio or update.message.video:
+            await context.bot.send_message(chat_id=user_id, text=unsupported_file_message, parse_mode="Markdown")
 
 # Handler to handle user's messages
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_chat.id
-    telegram_handle = update.effective_user.username
+
 
     try:
         # Retrieve user's NUSNET ID
@@ -585,23 +453,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error retrieving NUSNET ID for user {user_id}: {db_error}")
         await context.bot.send_message(chat_id=user_id, text="An error occurred. Please try again later.")
         return
-
-    # Check if user is authenticated
-    try:
-        if not chat_db.is_user_authenticated(user_id=user_id, telegram_handle=telegram_handle):
-            await context.bot.send_message(chat_id=user_id, text="Please use /start to authenticate.")
-            return
-    except Exception as auth_error:
-        logging.error(f"Authentication error for user {user_id}: {auth_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred during authentication. Please try again later.")
-        return
-    
-    if "category" not in context.user_data:
-        await context.bot.send_message(chat_id=user_id, text="Please start a new conversation by sending /new.")
-        return
-    
+            
     user_message = update.message.text
-    logging.info(f"Message received from user {user_id}: {user_message}")
+    logging.info(f"from user {user_id}: {user_message}")
 
     try:
         # Retrieve most recent conversation ID
@@ -611,20 +465,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=user_id, text="An error occurred while retrieving your conversation history. Please try again later.")
         return
 
-    try:
-        # Get response from LLM
-        response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id, 
-                                                        intention = context.user_data['category'], user_context = "")
-    except Exception as llm_error:
-        logging.error(f"Error generating LLM response for user {user_id}: {llm_error}")
-        await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
-        return
-    
-    await reply_to_query_feedback(update=update, context=context, user_id=user_id, response=response, 
+    else:
+
+        try:
+            # Get response from LLM
+            user_context = "".join(context.user_data['documents']) if "documents" in context.user_data else ""
+
+            response = await llm.response_message(message=user_message, nusnet_id=nusnet_id, conversation_id=conversation_id, 
+                                                         user_context = user_context)
+                    
+
+        except Exception as llm_error:
+            logging.error(f"Error generating LLM response for user {user_id}: {llm_error}")
+            await context.bot.send_message(chat_id=user_id, text="An error occurred while processing your message. Please try again later.")
+            return
+                
+        await reply_to_query_feedback(update=update, context=context, user_id=user_id, response=response, 
                                               prompt=user_message, conversation_id=conversation_id)
+        
+        context.user_data['documents'] = []
 
 
-# Handler for cancel
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
     await context.bot.send_message(chat_id=user_id, text="No worries 😅. Please use /new to *make a new query*", parse_mode="Markdown")
@@ -662,9 +524,8 @@ async def main():
     query_handler = CallbackQueryHandler(handle_query)
     export_chat_handler = CommandHandler("export_chat", export_chat)
     export_feedback_handler = CommandHandler("export_feedback", export_feedback)
-
-
-    application.add_handler(MessageHandler(filters.REPLY & (~filters.COMMAND), capture_reply))  # Handles ForceReply responses
+    
+    # application.add_handler(MessageHandler(filters.REPLY & (~filters.COMMAND), capture_reply))  # Handles ForceReply responses
 
     application.add_handler(query_handler)
     application.add_handler(start_handler)

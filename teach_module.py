@@ -242,7 +242,7 @@ class Teacher:
         self.prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", self.teaching_prompt),
-                MessagesPlaceholder("chat_history"),
+                MessagesPlaceholder("chat_history", n_messages=10),
                 ("human", "Context: {context} \n\n Prompt: {input}"),
             ]
         )

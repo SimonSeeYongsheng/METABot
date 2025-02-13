@@ -9,17 +9,11 @@ load_dotenv() # Load environment variables from .env file
 from langchain_openai import ChatOpenAI # (Can swap with Gemini AI)
 import chat_database
 
-from langchain.chains.combine_documents.base import (
-    DEFAULT_DOCUMENT_PROMPT,
-    DEFAULT_DOCUMENT_SEPARATOR,
-)
 
 import logging
 import analysis_module
 import misconception_module
-import guidance_module
 import teach_module
-import assignment_classifier
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -35,7 +29,7 @@ class LLM:
 
 
         if LLM == None:
-            self.llm = ChatOpenAI(model="gpt-4o-mini", api_key=os.environ.get('OPENAI_API_KEY'), temperature=0)
+            self.llm = ChatOpenAI(model="gpt-4o", api_key=os.environ.get('OPENAI_API_KEY'), temperature=0)
         else:
             self.llm = LLM
 
@@ -44,11 +38,9 @@ class LLM:
         else:
             self.chat_database = Chat_Database
 
-        self.assignment = assignment_classifier.Assignment_Classifier(self.llm)
         self.analyse = analysis_module.Analyser(self.llm)
         self.misconception = misconception_module.Misconception(self.llm)
         self.teach = teach_module.Teacher(llm=self.llm, database=self.chat_database)
-        self.guide = guidance_module.Guide(llm=self.llm, database=self.chat_database)
 
     # Response to assignment classification
     async def assignment_message(self, message : str):
