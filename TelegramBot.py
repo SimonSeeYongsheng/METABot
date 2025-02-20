@@ -11,7 +11,7 @@ from telegram import Update, BotCommand
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
-from telegram.ext import CallbackQueryHandler
+from telegram.ext import CallbackQueryHandler, ConversationHandler, PollAnswerHandler
 
 import llm_module # module for the LLM
 
@@ -24,7 +24,7 @@ import telegramify_markdown # module to convert markdown to markdownV2 response
 from telegramify_markdown.customize import markdown_symbol
 from telegramify_markdown.interpreters import BaseInterpreter, MermaidInterpreter
 from telegramify_markdown.type import ContentTypes
-
+import csv
 load_dotenv() # Load environment variables from .env file
 
 TELE_BOT_TOKEN = os.environ.get('TELE_BOT_TOKEN')
@@ -39,7 +39,7 @@ chat_db = chat_database.Chat_DB()
 llm = llm_module.LLM(Chat_Database=chat_db)
 docs_process = docs_processor.Docs_processor()
 
-supported_file_types = ["pdf", "txt", "py", "html", "js", "css", "htm"]
+supported_file_types = ["pdf", "txt", "py", "html", "js", "css", "htm", "csv"]
 
 start_message = (
     "👋 *Welcome to METABot!*\n\n"
@@ -508,7 +508,116 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logging.error(f"Failed to send error notification: {e}")
 
+##########################################################################################################################################
+# Define a new state for the quiz upload conversation
+QUIZ_UPLOAD = 1
 
+# Handler to start the quiz upload conversation
+async def start_quiz_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    # Check if user is a teacher/admin (adjust as needed)
+    if not chat_db.is_admin(user_id=user_id):
+        await context.bot.send_message(chat_id=user_id, text="Unauthorized: Only teachers can upload quiz questions.")
+        return ConversationHandler.END
+    await context.bot.send_message(
+        chat_id=user_id,
+        text="Please upload a CSV file containing your quiz questions.\n\n"
+             "Expected CSV format per row: *question, option1, option2, option3, option4, correct_option_index, explanation*\n\n"
+             "(The correct option index should be 0-indexed.)",
+        parse_mode="Markdown"
+    )
+    return QUIZ_UPLOAD
+
+# Handler to process the uploaded CSV file and send quiz polls
+async def process_quiz_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    document = update.message.document
+    file_name = document.file_name
+
+    # Ensure the file has a .csv extension
+    _, ext = os.path.splitext(file_name)
+    if ext.lower() != ".csv":
+        await context.bot.send_message(chat_id=user_id, text="Please upload a valid CSV file.")
+        return QUIZ_UPLOAD  # Stay in the state for a correct file
+
+    # Download the CSV file
+    try:
+        file = await document.get_file()
+        file_path = os.path.join(FILE_DRIVE, file_name)
+        await file.download_to_drive(custom_path=file_path)
+        logging.info(f"CSV file downloaded: {file_path}")
+    except Exception as e:
+        logging.error(f"Error downloading CSV file: {e}")
+        await context.bot.send_message(chat_id=user_id, text="Failed to download the CSV file. Please try again.")
+        return ConversationHandler.END
+
+    polls_sent = 0
+
+    # Retrieve the list of all students (non-admin users)
+    student_ids = chat_db.get_all_students()  # Expects a list of user_id values
+
+    # Also include the teacher who uploaded the CSV
+    recipients = student_ids + [user_id]
+
+    # Process the CSV file
+    try:
+        with open(file_path, newline='', encoding='utf-8') as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                # Expecting at least 7 columns: question, option1, option2, option3, option4, correct_option_index, explanation
+                if len(row) < 7:
+                    logging.warning(f"Row skipped (not enough columns): {row}")
+                    continue
+                question = row[0]
+                options = row[1:5]
+                try:
+                    correct_index = int(row[5])
+                except ValueError:
+                    logging.warning(f"Invalid correct option index in row: {row}")
+                    continue
+                explanation = row[6].strip()
+
+                # Send the poll to every recipient (students + teacher)
+                for recipient in recipients:
+                    try:
+                        await context.bot.send_poll(
+                            chat_id=recipient,
+                            question=question,
+                            options=options,
+                            type='quiz',
+                            correct_option_id=correct_index,
+                            is_anonymous=True,
+                            explanation=explanation,
+                            explanation_parse_mode="Markdown"
+                        )
+                        polls_sent += 1
+                    except Exception as poll_error:
+                        logging.error(f"Error sending poll to recipient {recipient}: {poll_error}")
+                        continue
+    except Exception as csv_error:
+        logging.error(f"Error processing CSV file: {csv_error}")
+        await context.bot.send_message(chat_id=user_id, text="Failed to process the CSV file.")
+    finally:
+        # Remove the CSV file after processing
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logging.info(f"Removed CSV file: {file_path}")
+            except Exception as remove_error:
+                logging.error(f"Error removing CSV file: {remove_error}")
+
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=f"Quiz upload complete. {polls_sent} poll(s) sent to {len(recipients)} recipient(s)."
+    )
+    return ConversationHandler.END
+
+
+# (Optional) Handler to cancel the quiz upload conversation
+async def cancel_quiz_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    await context.bot.send_message(chat_id=user_id, text="Quiz upload cancelled.")
+    return ConversationHandler.END
 
 async def main():
 
@@ -524,8 +633,18 @@ async def main():
     query_handler = CallbackQueryHandler(handle_query)
     export_chat_handler = CommandHandler("export_chat", export_chat)
     export_feedback_handler = CommandHandler("export_feedback", export_feedback)
-    
-    # application.add_handler(MessageHandler(filters.REPLY & (~filters.COMMAND), capture_reply))  # Handles ForceReply responses
+
+    quiz_upload_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler('upload_quiz', start_quiz_upload)],
+    states={
+        QUIZ_UPLOAD: [MessageHandler(filters.Document.ALL, process_quiz_csv)]
+    },
+    fallbacks=[CommandHandler('cancel', cancel_quiz_upload)]
+    )
+
+    # Then add this handler to your application:
+    application.add_handler(quiz_upload_conv_handler)
+
 
     application.add_handler(query_handler)
     application.add_handler(start_handler)
@@ -536,9 +655,6 @@ async def main():
     application.add_handler(document_handler)
     application.add_handler(export_chat_handler)
     application.add_handler(export_feedback_handler)
-
-
-
     application.add_error_handler(error_handler)
 
     # Set menu commands

@@ -168,8 +168,12 @@ class Chat_DB:
 
         return conversation_id
 
-    def get_all_nusnet_ids(self):
-        return self.users_collection.distinct("nusnet_id")
+    def get_all_students(self):
+        # Query for documents where 'is_admin' is False and only return the 'user_id' field
+        cursor = self.users_collection.find({"is_admin": False}, {"user_id": 1, "_id": 0})
+        # Build a list of user_ids from the query results
+        user_ids = [doc["user_id"] for doc in cursor if "user_id" in doc]
+        return user_ids
     
     def input_callback_data(self, prompt: str, response: str, conversation_id: int):
 
