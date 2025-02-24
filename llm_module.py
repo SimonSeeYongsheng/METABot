@@ -14,6 +14,7 @@ import logging
 import analysis_module
 import misconception_module
 import teach_module
+import mistake_module
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -41,6 +42,7 @@ class LLM:
         self.analyse = analysis_module.Analyser(self.llm)
         self.misconception = misconception_module.Misconception(self.llm)
         self.teach = teach_module.Teacher(llm=self.llm, database=self.chat_database)
+        self.mistake = mistake_module.Mistakes_Summariser(llm=self.llm)
 
     # Response to assignment classification
     async def assignment_message(self, message : str):
@@ -88,4 +90,16 @@ class LLM:
         logging.info(f"Teaching: {response}")
 
         return response
+    
+    # Response to mistake summary request
+    async def mistake_message(self, mistakes: str):
+
+        response = await self.mistake.get_summary(message=mistakes)
+
+        logging.info(f"Msitakes: {response}")
+
+        return response
+
+
+
 

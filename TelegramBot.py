@@ -523,7 +523,8 @@ async def start_quiz_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=user_id,
         text="Please upload a CSV file containing your quiz questions.\n\n"
              "Expected CSV format per row: *question, option1, option2, option3, option4, correct_option_index, explanation*\n\n"
-             "(The correct option index should be 0-indexed.)",
+             "(The correct option index should be 0-indexed.)\n\n"
+             "type /cancel to cancel the upload process.",
         parse_mode="Markdown"
     )
     return QUIZ_UPLOAD
@@ -553,11 +554,14 @@ async def process_quiz_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     polls_sent = 0
 
+    # Get latest quiz id
+    quiz_id = chat_db.get_latest_quiz_id() + 1
+
     # Retrieve the list of all students (non-admin users)
     student_ids = chat_db.get_all_students()  # Expects a list of user_id values
 
-    # Also include the teacher who uploaded the CSV
-    recipients = student_ids + [user_id]
+    # Also include the teacher who uploaded the CSV if desired
+    recipients = student_ids + [user_id] # if you wish to include the teacher
 
     # Process the CSV file
     try:
@@ -568,29 +572,63 @@ async def process_quiz_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if len(row) < 7:
                     logging.warning(f"Row skipped (not enough columns): {row}")
                     continue
-                question = row[0]
-                options = row[1:5]
+
+                question = row[0].strip()
+                raw_options = [opt.strip() for opt in row[1:5]]
+                # Filter out options marked as '-' (treat as non-existent)
+                valid_options = [opt for opt in raw_options if opt != '-']
+
+                # Log if there are less than 4 valid options
+                if len(valid_options) < 4:
+                    logging.info(f"Question has less than 4 valid options: '{question}'. Only {len(valid_options)} valid option(s) found.")
+
+                # Ensure there are at least 2 options for a poll
+                if len(valid_options) < 2:
+                    logging.warning(f"Row skipped (not enough valid options): {row}")
+                    continue
+
+                # Parse the correct option index from the CSV (assumed 0-indexed)
                 try:
-                    correct_index = int(row[5])
+                    correct_raw_index = int(row[5])
                 except ValueError:
                     logging.warning(f"Invalid correct option index in row: {row}")
                     continue
+
+                # Check that the designated correct option is not marked as '-'
+                if raw_options[correct_raw_index] == '-':
+                    logging.warning(f"Correct option marked as '-' in row: {row}")
+                    continue
+
+                # Map the CSV correct index (based on raw_options) to the new index in valid_options.
+                # Count how many valid options appear before (and including) the correct option.
+                new_correct_index = sum(1 for i in range(correct_raw_index + 1) if raw_options[i] != '-') - 1
+
                 explanation = row[6].strip()
 
-                # Send the poll to every recipient (students + teacher)
+                # Send the poll to every recipient
                 for recipient in recipients:
                     try:
-                        await context.bot.send_poll(
+                        msg = await context.bot.send_poll(
                             chat_id=recipient,
                             question=question,
-                            options=options,
+                            options=valid_options,
                             type='quiz',
-                            correct_option_id=correct_index,
-                            is_anonymous=True,
+                            correct_option_id=new_correct_index,
+                            is_anonymous=False,  # Must be False to get answer details
                             explanation=explanation,
                             explanation_parse_mode="Markdown"
                         )
                         polls_sent += 1
+                        # Store the poll details in the database for later retrieval.
+                        poll = msg.poll  # Extract the Poll object
+                        chat_db.store_poll_details(
+                            quiz_id=quiz_id,
+                            poll_id=poll.id,
+                            question=question,
+                            correct_option_id=new_correct_index,
+                            options=valid_options,
+                            explanation=explanation
+                        )
                     except Exception as poll_error:
                         logging.error(f"Error sending poll to recipient {recipient}: {poll_error}")
                         continue
@@ -613,11 +651,135 @@ async def process_quiz_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+
+
 # (Optional) Handler to cancel the quiz upload conversation
 async def cancel_quiz_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
     await context.bot.send_message(chat_id=user_id, text="Quiz upload cancelled.")
     return ConversationHandler.END
+
+async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    poll_answer = update.poll_answer
+    user = poll_answer.user
+    poll_id = poll_answer.poll_id
+    selected_options = poll_answer.option_ids  # List of selected option indices.
+    user_id = user.id
+
+    # Retrieve the student's NUSNET id.
+    nusnet_id = chat_db.get_nusnet_id(user_id)
+
+    # Get the quiz details for this poll.
+    poll_details = chat_db.get_poll_details(poll_id)
+    if poll_details is None:
+        logging.error(f"No poll details found for poll_id {poll_id}")
+        return
+    quiz_id = poll_details.get("quiz_id")
+    question = poll_details.get("question")
+    correct_option_id = poll_details.get("correct_option_id")
+    options = poll_details.get("options")
+    explanation = poll_details.get("explanation")
+    # Assuming single-answer quiz polls.
+    student_answer = selected_options[0] if selected_options else None
+    is_correct = (student_answer == correct_option_id)
+
+    # Store the quiz response with all the required details.
+    chat_db.store_quiz_response(
+         quiz_id=quiz_id,
+         poll_id=poll_id,
+         user_id=user_id,
+         nusnet_id=nusnet_id,
+         student_answer=student_answer,
+         question=question,
+         correct_option_id=correct_option_id,
+         options=options,
+         explanation=explanation,
+         is_correct=is_correct,
+         timestamp=datetime.now()
+    )
+
+    logging.info(f"Stored quiz response from user {user_id} for poll {poll_id}: student_answer={student_answer}, is_correct={is_correct}")
+
+# Add this new command handler somewhere in your TelegramBot.py file
+async def remediate_students(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    teacher_id = update.effective_chat.id
+
+    # Verify that the user is a teacher/admin.
+    if not chat_db.is_admin(user_id=teacher_id):
+        await context.bot.send_message(chat_id=teacher_id, text="Unauthorized: Only teachers can initiate remediation.")
+        return
+
+    # Retrieve all student user IDs (non-admin users)
+    student_ids = chat_db.get_all_students()
+    if not student_ids:
+        await context.bot.send_message(chat_id=teacher_id, text="No students found.")
+        return
+
+    for student_user_id in student_ids:
+        # Retrieve the student's NUSNET ID.
+        student_nusnet = chat_db.get_nusnet_id(student_user_id)
+        if not student_nusnet:
+            continue
+
+        # Get only the latest mistakes for the student.
+        latest_mistakes = chat_db.get_latest_mistakes_by_student(student_nusnet)
+        if not latest_mistakes:
+            continue  # Skip students with no mistakes in the latest quiz
+
+        # Compile a summary of the mistakes
+        mistakes_summary = []
+        for mistake in latest_mistakes:
+            mistakes_summary.append(
+                f"*Question:* {mistake.get('question')}\n"
+                f"*Your Answer:* {mistake.get('student_answer')}\n"
+                f"*Correct Answer:* {mistake.get('correct_option_id')}\n"
+                f"*Explanation:* {mistake.get('explanation')}"
+            )
+
+        # Create a remediation message
+        summary_text = "\n\n".join(mistakes_summary)
+        remediation_message = await llm.mistake_message(summary_text)
+
+        # Start a new conversation for the student
+        conversation_id = chat_db.start_new_conversation(message=remediation_message, nusnet_id=student_nusnet)
+
+        # Send the remediation message to the student
+        try:
+            await reply_to_query(update=update, context=context, user_id=student_user_id, response=remediation_message)
+        except Exception as e:
+            logging.error(f"Failed to send remediation message to student {student_user_id}: {e}")
+
+    # Inform the teacher that remediation messages have been sent
+    await context.bot.send_message(chat_id=teacher_id, text="Remediation messages have been sent to students based on the latest quiz results.")
+
+async def export_quiz_responses(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    file_path = f"quiz_responses_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+
+    try:
+        # Only allow admins to use this command.
+        if not chat_db.is_admin(user_id=user_id):
+            await context.bot.send_message(chat_id=user_id, text="Unauthorized access. This command is for admins only.")
+            return
+
+        # Export the quiz responses collection to a CSV file.
+        chat_db.export_quiz_responses_collection_to_csv(file_path)
+
+        # Send the file to the admin.
+        with open(file_path, 'rb') as document:
+            await context.bot.send_document(chat_id=user_id, document=document)
+    except Exception as e:
+        logging.error(f"Error exporting quiz responses: {e}")
+        await context.bot.send_message(chat_id=user_id, text="Failed to export quiz responses.")
+    finally:
+        # Delete the file after sending.
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as delete_error:
+                logging.error(f"Error deleting file {file_path}: {delete_error}")
+
+
 
 async def main():
 
@@ -641,10 +803,16 @@ async def main():
     },
     fallbacks=[CommandHandler('cancel', cancel_quiz_upload)]
     )
-
-    # Then add this handler to your application:
+    
     application.add_handler(quiz_upload_conv_handler)
+    poll_answer_handler = PollAnswerHandler(handle_poll_answer)
+    application.add_handler(poll_answer_handler)
 
+    remediate_handler = CommandHandler("remediate", remediate_students)
+    application.add_handler(remediate_handler)
+
+    export_quiz_handler = CommandHandler("export_quiz", export_quiz_responses)
+    application.add_handler(export_quiz_handler)
 
     application.add_handler(query_handler)
     application.add_handler(start_handler)

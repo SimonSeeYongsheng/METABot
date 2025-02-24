@@ -26,6 +26,7 @@ class Chat_DB:
    
         self.callback_collection_name = 'callback_collection'
         self.feedback_collection_name = "feedback_collection"
+        
 
         # MongoDB connection setup
         self.client = MongoClient(self.MONGO_URI)
@@ -34,6 +35,12 @@ class Chat_DB:
         self.chat_collection = self.db[self.chat_collection_name] # Collection to store chat history
         self.callback_collection = self.db[self.callback_collection_name] # Collection to store callback data
         self.feedback_collection = self.db[self.feedback_collection_name] # Collection to store feedback
+
+        self.poll_details_collection_name = "poll_details"
+        self.poll_details_collection = self.db[self.poll_details_collection_name]
+        self.quiz_responses_collection_name = "quiz_responses"
+        self.quiz_responses_collection = self.db[self.quiz_responses_collection_name]
+
 
 
     # Helper function to check if a user is authenticated
@@ -197,6 +204,73 @@ class Chat_DB:
 
         return str(document.inserted_id)
     
+    def store_poll_details(self, quiz_id: int, poll_id: str, question: str, correct_option_id: int, options: list, explanation: str):
+        document = {
+            "quiz_id": quiz_id,
+            "poll_id": poll_id,
+            "question": question,
+            "correct_option_id": correct_option_id,
+            "options": options,
+            "explanation": explanation,
+            "timestamp": datetime.now()
+        }
+        self.poll_details_collection.insert_one(document)
+
+    def get_poll_details(self, poll_id: str):
+        return self.poll_details_collection.find_one({"poll_id": poll_id})
+    
+    def get_latest_quiz_id(self):
+    # Retrieve the latest quiz ID from the poll_details_collection
+
+        latest_quiz = self.poll_details_collection.find_one(
+            {},  # Find any document
+            sort=[("quiz_id", -1)]  # Sort by quiz_id in descending order
+        )
+    
+        return latest_quiz["quiz_id"] if latest_quiz else 0  # Return the latest quiz_id or 0 if none exist
+
+
+
+    
+    def store_quiz_response(self, quiz_id: int, poll_id: str, user_id: str, nusnet_id: str, student_answer: int,
+                            question: str, correct_option_id: int, options: list, explanation: str,
+                            is_correct: bool, timestamp: datetime):
+        document = {
+            "quiz_id": quiz_id,
+            "poll_id": poll_id,
+            "user_id": user_id,
+            "nusnet_id": nusnet_id,
+            "question": question,
+            "options": options,
+            "correct_option_id": correct_option_id,
+            "student_answer": student_answer,
+            "explanation": explanation,
+            "is_correct": is_correct,
+            "timestamp": timestamp
+        }
+        self.quiz_responses_collection.insert_one(document)
+
+    def get_quiz_responses_by_student(self, nusnet_id: str):
+        """Retrieve all quiz responses for a given student."""
+        return list(self.quiz_responses_collection.find({"nusnet_id": nusnet_id}))
+    
+    def get_latest_mistakes_by_student(self, nusnet_id: str):
+        # Retrieve mistakes from the latest quiz taken by the student.
+        latest_quiz_id = self.get_latest_quiz_id()
+        if latest_quiz_id == 0:
+            return []  # No quizzes available
+
+        # Query for incorrect responses from the latest quiz
+        mistakes = list(self.quiz_responses_collection.find(
+            {"nusnet_id": nusnet_id, "quiz_id": latest_quiz_id, "is_correct": False}
+        ))
+
+        return mistakes
+
+
+
+
+    
     def export_chat_collection_to_csv(self, file_path: str):
         # Export the entire chat collection to a CSV file.
         try:
@@ -238,6 +312,25 @@ class Chat_DB:
 
         except Exception as e:
             raise RuntimeError("Failed to export teach feedback collection.") from e
+        
+    def export_quiz_responses_collection_to_csv(self, file_path: str):
+        # Export the entire quiz responses collection to a CSV file.
+        try:
+            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                # Query the quiz_responses collection
+                cursor = self.quiz_responses_collection.find()
+                first_doc = next(cursor, None)
+                if not first_doc:
+                    raise ValueError("No quiz responses to export.")
+                headers = list(first_doc.keys())
+                writer.writerow(headers)
+                writer.writerow(list(first_doc.values()))
+                for document in cursor:
+                    writer.writerow(list(document.values()))
+        except Exception as e:
+            raise RuntimeError("Failed to export quiz responses collection.") from e
+
 
 
 
