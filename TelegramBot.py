@@ -522,9 +522,12 @@ async def start_quiz_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=user_id,
         text="Please upload a CSV file containing your quiz questions.\n\n"
-             "Expected CSV format per row: *question, option1, option2, option3, option4, correct_option_index, explanation*\n\n"
-             "(The correct option index should be 0-indexed.)\n\n"
-             "type /cancel to cancel the upload process.",
+            "Expected CSV format per row: *question, option1, option2, option3, option4, correct_option_index, explanation*\n\n"
+        "- If a question has fewer than 4 options, mark the empty options with a `-`.\n"
+        "- The correct option index should be 0-indexed, based on the non-`-` options.\n\n"
+        "Example:\n"
+        "`What is 2+2?, 2, 4, -, -, 1, The correct answer is 4.`\n\n"
+        "Type /cancel to cancel the upload process.",
         parse_mode="Markdown"
     )
     return QUIZ_UPLOAD
