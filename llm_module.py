@@ -14,7 +14,7 @@ import logging
 import analysis_module
 import misconception_module
 import teach_module
-import mistake_module
+import daily_initiator
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -42,7 +42,7 @@ class LLM:
         self.analyse = analysis_module.Analyser(self.llm)
         self.misconception = misconception_module.Misconception(self.llm)
         self.teach = teach_module.Teacher(llm=self.llm, database=self.chat_database)
-        self.mistake = mistake_module.Mistakes_Summariser(llm=self.llm)
+        self.initiator = daily_initiator.DailyConversationInitiator(llm=self.llm, database=self.chat_database)
 
     # Response to assignment classification
     async def assignment_message(self, message : str):
@@ -57,46 +57,42 @@ class LLM:
         return assignment_name
 
     # Response to analysis request
-    async def analyse_message(self, nusnet_id : str):
+    async def analyse_message(self, user_id : str):
 
-        messages = self.chat_database.get_all_conversation(nusnet_id=nusnet_id)
-        name = self.chat_database.get_name(nusnet_id=nusnet_id)
+        messages = self.chat_database.get_all_conversation(user_id=user_id)
 
-        response = await self.analyse.get_analysis(name=name, nusnet_id=nusnet_id,
-                                                    messages=messages)
+        response = await self.analyse.get_analysis(messages=messages)
         
         logging.info(f"Analysis report: {response}")
         
         return response
     
     # Response to misconception request
-    async def misconception_message(self, nusnet_id : str):
+    async def misconception_message(self, user_id : str):
 
-        messages = self.chat_database.get_all_conversation(nusnet_id=nusnet_id)
-        name = self.chat_database.get_name(nusnet_id=nusnet_id)
+        messages = self.chat_database.get_all_conversation(user_id=user_id)
 
-        response = await self.misconception.get_misconception(name=name, nusnet_id=nusnet_id,
-                                                 messages=messages)
+
+        response = await self.misconception.get_misconception(messages=messages)
         
         logging.info(f"Misconception report: {response}")
         
         return response
 
     # Response to text message    
-    async def response_message(self, message: str, nusnet_id : str, conversation_id: str, user_context: str):
+    async def response_message(self, message: str, user_id : str, conversation_id: str, user_context: str):
 
-        response = await self.teach.get_response(message=message, nusnet_id=nusnet_id, 
+        response = await self.teach.get_response(message=message, user_id=user_id, 
                                                          conversation_id=conversation_id, user_context = user_context)
         logging.info(f"Teaching: {response}")
 
         return response
     
-    # Response to mistake summary request
-    async def mistake_message(self, mistakes: str):
+    async def starter_message(self, user_id: str):
 
-        response = await self.mistake.get_summary(message=mistakes)
+        response = await self.initiator.initiate_conversation(user_id=user_id)
 
-        logging.info(f"Msitakes: {response}")
+        logging.info(f"Starter: {response}")
 
         return response
 

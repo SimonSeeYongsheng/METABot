@@ -34,10 +34,10 @@ class Misconception:
 
         ### Report Guidelines:
         Begin the report with the following format:
-        *Here is a misconception report of the chat history between {nusnet_id}, {name} and the educational chatbot as of {datetime}:*
+        *Here is a misconception report of the chat history between the user and the educational chatbot as of {datetime}:*
 
         If no chat history is available, respond with:
-        *There is no chat history available for {nusnet_id}, {name} as of {datetime}. Therefore, no misconception report can be provided at this time.*
+        *There is no chat history available for as of {datetime}. Therefore, no misconception report can be provided at this time.*
 
         For each identified misconception:
         - Clearly state the **topic** (e.g., *React State Management*, *ExpressJS Middleware*, *CSS Grid vs Flexbox*).
@@ -74,9 +74,8 @@ class Misconception:
 
         self.misconception_chain = self.misconception_prompt | self.llm | StrOutputParser()
 
-    async def get_misconception(self, name : str, nusnet_id : str, messages):
+    async def get_misconception(self, messages):
 
-        response = self.misconception_chain.invoke({"nusnet_id": nusnet_id, "name": name, 
-                                              "datetime": datetime.now().replace(microsecond=0), "chat_history": messages})
+        response = self.misconception_chain.invoke({ "datetime": datetime.now().replace(microsecond=0), "chat_history": messages})
     
         return response

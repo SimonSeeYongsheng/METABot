@@ -35,10 +35,10 @@ class Analyser:
 
     The report should begin with the following format:
 
-    *Here is a learning behavior analysis report of {nusnet_id}, {name} as of {datetime} using the Felder-Silverman Learning Style Model:* 
+    *Here is a learning behavior analysis report as of {datetime} using the Felder-Silverman Learning Style Model:* 
 
     **If no chat history is available for this user, respond with:**
-    *There is no chat history available for {nusnet_id}, {name} as of {datetime}. Therefore, no learning behavior analysis can be provided at this time.*
+    *There is no chat history available as of {datetime}. Therefore, no learning behavior analysis can be provided at this time.*
 
     **If insufficient information exists to classify a dimension, respond with:**
     *There is not enough information available to classify the user's preference for this learning dimension at this time.*
@@ -93,9 +93,8 @@ class Analyser:
 
         self.analyse_chain = self.anaylse_prompt | self.llm | StrOutputParser()
 
-    async def get_analysis(self, name : str, nusnet_id : str, messages):
+    async def get_analysis(self, messages):
 
-        response = self.analyse_chain.invoke({"nusnet_id": nusnet_id, "name": name, 
-                                              "datetime": datetime.now().replace(microsecond=0), "chat_history": messages})
+        response = self.analyse_chain.invoke({"datetime": datetime.now().replace(microsecond=0), "chat_history": messages})
     
         return response

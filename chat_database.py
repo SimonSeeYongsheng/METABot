@@ -38,61 +38,55 @@ class Chat_DB:
 
         self.poll_details_collection_name = "poll_details"
         self.poll_details_collection = self.db[self.poll_details_collection_name]
-        self.quiz_responses_collection_name = "quiz_responses"
-        self.quiz_responses_collection = self.db[self.quiz_responses_collection_name]
+        self.poll_responses_collection_name = "poll_responses"
+        self.poll_responses_collection = self.db[self.poll_responses_collection_name]
 
 
 
     # Helper function to check if a user is authenticated
-    def is_user_authenticated(self, user_id: str,telegram_handle: str):
-        user = self.users_collection.find_one({"telegram_handle": telegram_handle})
+    def is_user_authenticated(self, user_id: str):
+        user = self.users_collection.find_one({"user_id": user_id})
         if user:
             if user.get("is_authenticated"):
                 return True
             else:
-                mongo_id = {'_id' : user.get("_id")}
+                mongo_id = {'_id': user.get("_id")}
                 new_values = {
-                                '$set': {
-                                    "user_id": user_id,
-                                    "is_authenticated": True,
-                                    "joined_date": datetime.now()
-                                    
-                                }
-                            }
+                    '$set': {
+                        "is_authenticated": True,
+                        "joined_date": datetime.now()
+                    }
+                }
                 self.users_collection.update_one(mongo_id, new_values)
                 return True
-        return False
+        else:
+            
+            return False
+
     
-    # Helper function to check to get nusnet_id by user_id
-    def get_nusnet_id(self, user_id: str):
+
+    
+    def user_exist(self, user_id: str):
         user = self.users_collection.find_one({"user_id": user_id})
-        return user.get("nusnet_id")
-    
-    def user_exist(self, nusnet_id: str):
-        user = self.users_collection.find_one({"nusnet_id": nusnet_id})
         return True if user else False
-    
-    def get_name(self, nusnet_id: str):
-        user = self.users_collection.find_one({"nusnet_id": nusnet_id})
-        return user.get("name")
     
     def is_admin(self, user_id: str):
         user = self.users_collection.find_one({"user_id": user_id})
         return user.get("is_admin")
 
-    def get_by_session_id(self, nusnet_id: str, conversation_id: str) -> MongoDBChatMessageHistory:
+    def get_by_session_id(self, user_id: str, conversation_id: str) -> MongoDBChatMessageHistory:
 
         return MongoDBChatMessageHistory(
-                session_id={"nusnet_id": nusnet_id, "conversation_id": conversation_id},
+                session_id={"user_id": user_id, "conversation_id": conversation_id},
                 connection_string=self.MONGO_URI,
                 database_name=self.database_name,
                 collection_name=self.chat_collection_name,
             )
     
-    def get_recent_conversation(self, nusnet_id: str):
+    def get_recent_conversation(self, user_id: str):
 
         # Query the chat collection for the most recent conversation of the given user
-        recent_conversation = self.chat_collection.find({ "SessionId.nusnet_id": nusnet_id }).sort("SessionId.conversation_id", -1).limit(1).to_list()
+        recent_conversation = self.chat_collection.find({ "SessionId.user_id": user_id }).sort("SessionId.conversation_id", -1).limit(1).to_list()
   
         # If a conversation is found, return the conversation_id
         if len(recent_conversation) > 0:
@@ -101,7 +95,7 @@ class Chat_DB:
             return recent_conversation[0].get("SessionId").get("conversation_id")
         
         # If no conversation is found, return 0
-        return 0
+        return 1
     
     def get_callback_data(self, object_id: str):
 
@@ -116,24 +110,24 @@ class Chat_DB:
  
         return [prompt, response, conversation_id]
         
-    def get_all_conversation(self, nusnet_id: str):
+    def get_all_conversation(self, user_id: str):
 
         messages = []
-        recent_convo_id = self.get_recent_conversation(nusnet_id=nusnet_id)
+        recent_convo_id = self.get_recent_conversation(user_id=user_id)
 
         if recent_convo_id:
 
             for convo_id in range(1, recent_convo_id + 1):
-                messages.extend(self.get_by_session_id(nusnet_id=nusnet_id, conversation_id=convo_id).messages)
+                messages.extend(self.get_by_session_id(user_id=user_id, conversation_id=convo_id).messages)
                 
         return messages
     
-    def add_human_message(self, message: str, nusnet_id: str):
+    def add_human_message(self, message: str, user_id: str):
 
-        conversation_id = self.get_recent_conversation(nusnet_id)
+        conversation_id = self.get_recent_conversation(user_id)
 
         chat_session_history = MongoDBChatMessageHistory(
-                session_id={"nusnet_id": nusnet_id, "conversation_id": conversation_id},
+                session_id={"user_id": user_id, "conversation_id": conversation_id},
                 connection_string=self.MONGO_URI,
                 database_name=self.database_name,
                 collection_name=self.chat_collection_name,
@@ -143,12 +137,12 @@ class Chat_DB:
         
         return
     
-    def add_ai_message(self, message: str, nusnet_id: str):
+    def add_ai_message(self, message: str, user_id: str):
 
-        conversation_id = self.get_recent_conversation(nusnet_id)
+        conversation_id = self.get_recent_conversation(user_id)
 
         chat_session_history = MongoDBChatMessageHistory(
-                session_id={"nusnet_id": nusnet_id, "conversation_id": conversation_id},
+                session_id={"user_id": user_id, "conversation_id": conversation_id},
                 connection_string=self.MONGO_URI,
                 database_name=self.database_name,
                 collection_name=self.chat_collection_name,
@@ -160,12 +154,12 @@ class Chat_DB:
 
 
     
-    def start_new_conversation(self, message: str, nusnet_id: str):
+    def start_new_conversation(self, message: str, user_id: str):
 
-        conversation_id = self.get_recent_conversation(nusnet_id) + 1
+        conversation_id = self.get_recent_conversation(user_id) + 1
 
         chat_session_history = MongoDBChatMessageHistory(
-                session_id={"nusnet_id": nusnet_id, "conversation_id": conversation_id},
+                session_id={"user_id": user_id, "conversation_id": conversation_id},
                 connection_string=self.MONGO_URI,
                 database_name=self.database_name,
                 collection_name=self.chat_collection_name,
@@ -182,6 +176,20 @@ class Chat_DB:
         user_ids = [doc["user_id"] for doc in cursor if "user_id" in doc]
         return user_ids
     
+    def get_all_admins(self):
+        # Query for documents where 'is_admin' is True and only return the 'user_id' field
+        cursor = self.users_collection.find({"is_admin": True}, {"user_id": 1, "_id": 0})
+        # Build a list of user_ids from the query results
+        user_ids = [doc["user_id"] for doc in cursor if "user_id" in doc]
+        return user_ids
+    
+    def get_all_users(self):
+        cursor = self.users_collection.find({}, {"user_id": 1, "_id": 0})
+        user_ids = [doc["user_id"] for doc in cursor if "user_id" in doc]
+        return user_ids
+
+
+    
     def input_callback_data(self, prompt: str, response: str, conversation_id: int):
 
         document = self.callback_collection.insert_one({
@@ -192,26 +200,24 @@ class Chat_DB:
 
         return str(document.inserted_id)
     
-    def input_feedback_data(self, prompt: str, response: str, conversation_id: int, nusnet_id: str, sentiment : str):
+    def input_feedback_data(self, prompt: str, response: str, conversation_id: int, user_id: str, sentiment : str):
 
         document = self.feedback_collection.insert_one({
                 "prompt" : prompt,
                 "response" : response,
                 "conversation_id" : conversation_id,
-                "nusnet_id" : nusnet_id,
+                "user_id" : user_id,
                 "sentiment" : sentiment,
         })
 
         return str(document.inserted_id)
     
-    def store_poll_details(self, quiz_id: int, poll_id: str, question: str, correct_option_id: int, options: list, explanation: str):
+    def store_poll_details(self, poll_number: int, poll_id: str, question: str, options: list):
         document = {
-            "quiz_id": quiz_id,
+            "poll_number": poll_number,
             "poll_id": poll_id,
             "question": question,
-            "correct_option_id": correct_option_id,
             "options": options,
-            "explanation": explanation,
             "timestamp": datetime.now()
         }
         self.poll_details_collection.insert_one(document)
@@ -219,55 +225,27 @@ class Chat_DB:
     def get_poll_details(self, poll_id: str):
         return self.poll_details_collection.find_one({"poll_id": poll_id})
     
-    def get_latest_quiz_id(self):
-    # Retrieve the latest quiz ID from the poll_details_collection
-
-        latest_quiz = self.poll_details_collection.find_one(
-            {},  # Find any document
-            sort=[("quiz_id", -1)]  # Sort by quiz_id in descending order
+    def get_latest_poll_number(self):
+        latest_poll = self.poll_details_collection.find_one(
+            {}, 
+            sort=[("poll_number", -1)]
         )
-    
-        return latest_quiz["quiz_id"] if latest_quiz else 0  # Return the latest quiz_id or 0 if none exist
+        return latest_poll["poll_number"] if latest_poll else 0
 
 
 
     
-    def store_quiz_response(self, quiz_id: int, poll_id: str, user_id: str, nusnet_id: str, student_answer: int,
-                            question: str, correct_option_id: int, options: list, explanation: str,
-                            is_correct: bool, timestamp: datetime):
+    def store_poll_response(self, poll_number: int, poll_id: str, user_id: str, student_answer: str,
+                        question: str, timestamp: datetime):
         document = {
-            "quiz_id": quiz_id,
+            "poll_number": poll_number,
             "poll_id": poll_id,
             "user_id": user_id,
-            "nusnet_id": nusnet_id,
             "question": question,
-            "options": options,
-            "correct_option_id": correct_option_id,
             "student_answer": student_answer,
-            "explanation": explanation,
-            "is_correct": is_correct,
             "timestamp": timestamp
         }
-        self.quiz_responses_collection.insert_one(document)
-
-    def get_quiz_responses_by_student(self, nusnet_id: str):
-        """Retrieve all quiz responses for a given student."""
-        return list(self.quiz_responses_collection.find({"nusnet_id": nusnet_id}))
-    
-    def get_latest_mistakes_by_student(self, nusnet_id: str):
-        # Retrieve mistakes from the latest quiz taken by the student.
-        latest_quiz_id = self.get_latest_quiz_id()
-        if latest_quiz_id == 0:
-            return []  # No quizzes available
-
-        # Query for incorrect responses from the latest quiz
-        mistakes = list(self.quiz_responses_collection.find(
-            {"nusnet_id": nusnet_id, "quiz_id": latest_quiz_id, "is_correct": False}
-        ))
-
-        return mistakes
-
-
+        self.poll_responses_collection.insert_one(document)
 
 
     
@@ -313,23 +291,70 @@ class Chat_DB:
         except Exception as e:
             raise RuntimeError("Failed to export teach feedback collection.") from e
         
-    def export_quiz_responses_collection_to_csv(self, file_path: str):
-        # Export the entire quiz responses collection to a CSV file.
+    def export_poll_responses_collection_to_csv(self, file_path: str):
         try:
             with open(file_path, mode='w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
-                # Query the quiz_responses collection
-                cursor = self.quiz_responses_collection.find()
+                cursor = self.poll_responses_collection.find()
                 first_doc = next(cursor, None)
                 if not first_doc:
-                    raise ValueError("No quiz responses to export.")
+                    raise ValueError("No poll responses to export.")
                 headers = list(first_doc.keys())
                 writer.writerow(headers)
                 writer.writerow(list(first_doc.values()))
                 for document in cursor:
                     writer.writerow(list(document.values()))
         except Exception as e:
-            raise RuntimeError("Failed to export quiz responses collection.") from e
+            raise RuntimeError("Failed to export poll responses collection.") from e
+        
+    def export_users_collection_to_csv(self, file_path: str):
+        try:
+            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                cursor = self.users_collection.find()
+                first_doc = next(cursor, None)
+                if not first_doc:
+                    raise ValueError("No users to export.")
+                headers = list(first_doc.keys())
+                writer.writerow(headers)
+                writer.writerow(list(first_doc.values()))
+                for document in cursor:
+                    writer.writerow(list(document.values()))
+        except Exception as e:
+            raise RuntimeError("Failed to export users collection.") from e
+        
+
+    def store_ils_answer(self, user_id: str, question_index: int, answer: str):
+        doc = {
+            "user_id": user_id,
+            "question_index": question_index,
+            "answer": answer,
+            "timestamp": datetime.now()
+        }
+        self.db["ils_answers"].update_one(
+            {"user_id": user_id, "question_index": question_index},
+            {"$set": doc},
+            upsert=True
+        )
+
+    def get_ils_answers(self, user_id: str):
+        cursor = self.db["ils_answers"].find({"user_id": user_id}).sort("question_index", 1)
+        return [doc["answer"] for doc in cursor]
+
+    def clear_ils_answers(self, user_id: str):
+        self.db["ils_answers"].delete_many({"user_id": user_id})
+
+    def authenticate_user(self, user_id: str):
+
+        new_user = {
+                "user_id": user_id,
+                "is_authenticated": True,
+                "is_admin": False,   # New users are not admins by default.
+                "joined_date": datetime.now()
+            }
+        self.users_collection.insert_one(new_user)
+
+
 
 
 
