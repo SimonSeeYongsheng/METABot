@@ -610,11 +610,11 @@ async def start_poll_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=user_id,
         text=("Please upload a CSV file containing your poll questions.\n\n"
-              "Expected CSV format per row: *question, option1, option2, option3, option4*\n\n"
-              "- If a question has fewer than 4 options, mark the empty ones with a `-`.\n\n"
-              "Example:\n"
-              "`What is your favorite color?, Red, Blue, Green, -`"
-             ),
+            "Expected CSV format per row: *question, option1, option2, option3, option4, option5*\n\n"
+            "- If a question has fewer than 5 options, mark the empty ones with a -.\n\n"
+            "Example:\n"
+            "What is your favorite color?, Red, Blue, Green, Yellow, -"
+            ),
         parse_mode="Markdown"
     )
     return POLL_UPLOAD  # (You may also want to rename the state constant to POLL_UPLOAD)

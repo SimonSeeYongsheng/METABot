@@ -77,10 +77,7 @@ class LLM:
     async def misconception_message(self, user_id : str):
 
         messages = self.chat_database.get_all_conversation(user_id=user_id)
-
-
         response = await self.misconception.get_misconception(messages=messages)
-        
         logging.info(f"Misconception report: {response}")
         
         return response
