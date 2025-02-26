@@ -67,6 +67,12 @@ class LLM:
         
         return response
     
+    async def analyse_all_message(self, user_id: str):
+        messages = self.chat_database.get_all_conversation(user_id=user_id)
+        report = await self.analyse.get_analysis_all(messages=messages)
+        logging.info(f"Comprehensive analysis for user {user_id}: {report}")
+        return report
+    
     # Response to misconception request
     async def misconception_message(self, user_id : str):
 

@@ -93,8 +93,59 @@ class Analyser:
 
         self.analyse_chain = self.anaylse_prompt | self.llm | StrOutputParser()
 
+        # NEW: Additional system prompt for comprehensive analysis (for use in analyse_all)
+        self.analyse_all_system_prompt = (
+            """
+            You are an AI tasked with analyzing the chat history between a user and an educational chatbot to provide a comprehensive learning behavior analysis using the Felder-Silverman Learning Style Model.
+            
+            1. **Active vs. Reflective**:
+            - *Active Learners*: Prefer to process information through discussion, hands-on activities, or collaborative problem-solving.
+            - *Reflective Learners*: Prefer to think through and analyze information independently before acting.
+
+            2. **Sensing vs. Intuitive**:
+            - *Sensing Learners*: Focus on concrete facts, practical applications, and step-by-step processes.
+            - *Intuitive Learners*: Prefer abstract concepts, theories, and innovative approaches.
+
+            3. **Visual vs. Verbal**:
+            - *Visual Learners*: Understand better through images, diagrams, charts, or demonstrations.
+            - *Verbal Learners*: Prefer textual or spoken explanations and discussions.
+
+            4. **Sequential vs. Global**:
+            - *Sequential Learners*: Learn in logical, step-by-step progressions.
+            - *Global Learners*: Understand information in a holistic, big-picture manner and may make intuitive leaps in understanding.
+
+            The rating scale is as follows:
+            - Scores of 1 or 3: Fairly balanced between the two categories with a mild preference.
+            - Scores of 5 or 7: Moderate preference for one category, with some challenges in environments that do not cater to this preference.
+            - Scores of 9 or 11: Strong preference for one category, with significant difficulty in environments that do not address this preference.
+            
+            In your analysis, provide:
+            - For each dimension (Active/Reflective, Sensing/Intuitive, Visual/Verbal, Sequential/Global):
+              - A numerical score (integer between 1 and 11)
+              - An interpreted learning style (e.g. "Active" or "Reflective")
+            Format your response exactly as follows (each on a new line):
+
+            Active/Reflective: <Learning Style> (score: <number>)
+            Sensing/Intuitive: <Learning Style> (score: <number>)
+            Visual/Verbal: <Learning Style> (score: <number>)
+            Sequential/Global: <Learning Style> (score: <number>)
+
+            If no chat history is available, respond with:
+            No chat history available.
+            """
+        )
+        self.analyse_all_prompt = ChatPromptTemplate.from_messages([
+            ("system", self.analyse_all_system_prompt),
+            ("human", "Chat history: {chat_history}\nProvide a comprehensive learning behavior analysis report as specified above.")
+        ])
+        self.analyse_all_chain = self.analyse_all_prompt | self.llm | StrOutputParser()
+
     async def get_analysis(self, messages):
 
         response = self.analyse_chain.invoke({"datetime": datetime.now().replace(microsecond=0), "chat_history": messages})
     
+        return response
+    
+    async def get_analysis_all(self, messages):
+        response = self.analyse_all_chain.invoke({"chat_history": messages})
         return response

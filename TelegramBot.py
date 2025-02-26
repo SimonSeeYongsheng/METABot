@@ -25,6 +25,7 @@ from telegramify_markdown.customize import markdown_symbol
 from telegramify_markdown.interpreters import BaseInterpreter, MermaidInterpreter
 from telegramify_markdown.type import ContentTypes
 import csv
+import re
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from random import randint
@@ -875,10 +876,18 @@ async def finalize_ils(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Mark the user as authenticated
     chat_db.authenticate_user(user_id)
 
-    # Update the user's record in the users collection with the ILS result
+    # Build a merged analysis dictionary
+    ils_analysis = {
+    "Active/Reflective": {"style": results["Active/Reflective"], "score": scores["AR"]},
+    "Sensing/Intuitive": {"style": results["Sensing/Intuitive"], "score": scores["SI"]},
+    "Visual/Verbal": {"style": results["Visual/Verbal"], "score": scores["VV"]},
+    "Sequential/Global": {"style": results["Sequential/Global"], "score": scores["SG"]}
+    }
+
+    # Update the user's record in the users collection with the merged analysis
     chat_db.users_collection.update_one(
         {"user_id": user_id},
-        {"$set": {"learning_style": results}}
+        {"$set": {"start_ils_analysis": ils_analysis}}
     )
 
     await context.bot.send_message(chat_id=user_id, text=final_message, parse_mode="Markdown")
@@ -922,6 +931,96 @@ async def notify_admins(next_run):
         except Exception as e:
             logging.error(f"Error sending schedule info to admin {admin_id}: {e}")
 
+async def announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    admin_id = update.effective_chat.id
+    
+    # Check if the user is an admin
+    if not chat_db.is_admin(user_id=admin_id):
+        await context.bot.send_message(chat_id=admin_id, text="Unauthorized: This command is for admins only.")
+        return
+
+    # Ensure an announcement message was provided
+    if not context.args:
+        await context.bot.send_message(chat_id=admin_id, text="Usage: /announce <announcement message>")
+        return
+
+    # Combine the arguments to form the announcement message
+    announcement = "*[Announcement]*\n"
+    announcement += " ".join(context.args)
+
+    
+    # Retrieve all users from the database
+    all_users = chat_db.get_all_users()
+    sent_count = 0
+
+    # Loop over each user and send the announcement
+    for user in all_users:
+        try:
+            await context.bot.send_message(chat_id=user, text=announcement, parse_mode="Markdown")
+            sent_count += 1
+        except Exception as e:
+            logging.error(f"Failed to send announcement to user {user}: {e}")
+    
+    # Confirm to the admin that the announcement was sent
+    await context.bot.send_message(chat_id=admin_id, text=f"Announcement sent to {sent_count} users.")
+
+async def analyse_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    admin_id = update.effective_chat.id
+    if not chat_db.is_admin(user_id=admin_id):
+        await context.bot.send_message(chat_id=admin_id, text="Unauthorized: Only admins can use this command.")
+        return
+
+    await context.bot.send_message(chat_id=admin_id, text="Starting comprehensive analysis for all users...")
+    user_ids = chat_db.get_all_users()
+
+
+    # Regular expression to parse the expected report format.
+    pattern = (
+        r"Active/Reflective:\s*(.+?)\s+\(score:\s*(\d+)\).*?"
+        r"Sensing/Intuitive:\s*(.+?)\s+\(score:\s*(\d+)\).*?"
+        r"Visual/Verbal:\s*(.+?)\s+\(score:\s*(\d+)\).*?"
+        r"Sequential/Global:\s*(.+?)\s+\(score:\s*(\d+)\)"
+    )
+
+    for uid in user_ids:
+        messages = chat_db.get_all_conversation(user_id=uid)
+        if not messages:
+            await context.bot.send_message(chat_id=admin_id, text=f"User {uid}: No chat history available.")
+            continue
+        try:
+            report = await llm.analyse_all_message(user_id=uid)
+
+            if "No chat history available" in report:
+                await context.bot.send_message(chat_id=admin_id, text=f"User {uid}: Skipped (no chat history).")
+                continue
+            
+            match = re.search(pattern, report, re.DOTALL)
+            if match:
+                # Parse out each dimension's style and score
+                ar_analysis = {"style": match.group(1).strip(), "score": int(match.group(2))}
+                si_analysis = {"style": match.group(3).strip(), "score": int(match.group(4))}
+                vv_analysis = {"style": match.group(5).strip(), "score": int(match.group(6))}
+                sg_analysis = {"style": match.group(7).strip(), "score": int(match.group(8))}
+                
+                # Merge into one dictionary
+                ils_analysis = {
+                    "Active/Reflective": ar_analysis,
+                    "Sensing/Intuitive": si_analysis,
+                    "Visual/Verbal": vv_analysis,
+                    "Sequential/Global": sg_analysis
+                }
+                
+                # Update the user's record with the merged analysis
+                chat_db.users_collection.update_one(
+                    {"user_id": uid},
+                    {"$set": {"chat_ils_analysis": ils_analysis}}
+                )
+                await context.bot.send_message(chat_id=admin_id, text=f"User {uid}: Updated analysis.")
+            else:
+                await context.bot.send_message(chat_id=admin_id, text=f"User {uid}: Failed to parse analysis report.")
+        except Exception as e:
+            await context.bot.send_message(chat_id=admin_id, text=f"User {uid}: Analysis failed with error: {e}")
+
 async def main():
 
     # Build the bot application
@@ -937,6 +1036,8 @@ async def main():
     export_chat_handler = CommandHandler("export_chat", export_chat)
     export_feedback_handler = CommandHandler("export_feedback", export_feedback)
     export_users_handler = CommandHandler("export_users", export_users)
+    announce_handler = CommandHandler("announce", announce)
+    analyse_all_handler = CommandHandler("analyse_all", analyse_all)
 
     poll_upload_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('upload_poll', start_poll_upload)],
@@ -966,6 +1067,8 @@ async def main():
     application.add_handler(export_feedback_handler)
     application.add_handler(export_users_handler)
     application.add_error_handler(error_handler)
+    application.add_handler(announce_handler)
+    application.add_handler(analyse_all_handler)
 
     # Set menu commands
     await set_command_menu(application.bot)
