@@ -47,8 +47,6 @@ class DailyConversationInitiator:
 
         chat_history_text = last_ten_messages if last_ten_messages else "No previous messages available."
 
-        print("History", chat_history_text)
-
         # Get the current time to add temporal context.
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

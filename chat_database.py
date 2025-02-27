@@ -44,49 +44,38 @@ class Chat_DB:
 
 
     # Helper function to check if a user is authenticated
-    def is_user_authenticated(self, user_id: str):
+    def is_user_authenticated(self, user_id: int):
         user = self.users_collection.find_one({"user_id": user_id})
         if user:
             if user.get("is_authenticated"):
                 return True
             else:
-                mongo_id = {'_id': user.get("_id")}
-                new_values = {
-                    '$set': {
-                        "is_authenticated": True,
-                        "joined_date": datetime.now()
-                    }
-                }
-                self.users_collection.update_one(mongo_id, new_values)
-                return True
+                return False
         else:
             
             return False
-
     
-
-    
-    def user_exist(self, user_id: str):
+    def user_exist(self, user_id: int):
         user = self.users_collection.find_one({"user_id": user_id})
         return True if user else False
     
-    def is_admin(self, user_id: str):
+    def is_admin(self, user_id: int):
         user = self.users_collection.find_one({"user_id": user_id})
         return user.get("is_admin")
 
-    def get_by_session_id(self, user_id: str, conversation_id: str) -> MongoDBChatMessageHistory:
+    def get_by_session_id(self, user_id: int, conversation_id: int) -> MongoDBChatMessageHistory:
 
         return MongoDBChatMessageHistory(
-                session_id={"user_id": user_id, "conversation_id": conversation_id},
+                session_id={"user_id": int(user_id), "conversation_id": int(conversation_id)},
                 connection_string=self.MONGO_URI,
                 database_name=self.database_name,
                 collection_name=self.chat_collection_name,
             )
     
-    def get_recent_conversation(self, user_id: str):
+    def get_recent_conversation(self, user_id: int):
 
         # Query the chat collection for the most recent conversation of the given user
-        recent_conversation = self.chat_collection.find({ "SessionId.user_id": user_id }).sort("SessionId.conversation_id", -1).limit(1).to_list()
+        recent_conversation = self.chat_collection.find({ "SessionId.user_id": int(user_id)}).sort("SessionId.conversation_id", -1).limit(1).to_list()
   
         # If a conversation is found, return the conversation_id
         if len(recent_conversation) > 0:
@@ -94,7 +83,7 @@ class Chat_DB:
             
             return recent_conversation[0].get("SessionId").get("conversation_id")
         
-        # If no conversation is found, return 0
+        # If no conversation is found, return 1
         return 1
     
     def get_callback_data(self, object_id: str):
@@ -110,19 +99,19 @@ class Chat_DB:
  
         return [prompt, response, conversation_id]
         
-    def get_all_conversation(self, user_id: str):
+    def get_all_conversation(self, user_id: int):
 
         messages = []
-        recent_convo_id = self.get_recent_conversation(user_id=user_id)
+        recent_convo_id = self.get_recent_conversation(user_id=int(user_id))
 
         if recent_convo_id:
 
             for convo_id in range(1, recent_convo_id + 1):
-                messages.extend(self.get_by_session_id(user_id=user_id, conversation_id=convo_id).messages)
+                messages.extend(self.get_by_session_id(user_id=int(user_id), conversation_id=convo_id).messages)
                 
         return messages
     
-    def add_human_message(self, message: str, user_id: str):
+    def add_human_message(self, message: str, user_id: int):
 
         conversation_id = self.get_recent_conversation(user_id)
 
@@ -137,7 +126,7 @@ class Chat_DB:
         
         return
     
-    def add_ai_message(self, message: str, user_id: str):
+    def add_ai_message(self, message: str, user_id: int):
 
         conversation_id = self.get_recent_conversation(user_id)
 
@@ -154,12 +143,12 @@ class Chat_DB:
 
 
     
-    def start_new_conversation(self, message: str, user_id: str):
+    def start_new_conversation(self, message: str, user_id: int):
 
         conversation_id = self.get_recent_conversation(user_id) + 1
 
         chat_session_history = MongoDBChatMessageHistory(
-                session_id={"user_id": user_id, "conversation_id": conversation_id},
+                session_id={"user_id": int(user_id), "conversation_id": conversation_id},
                 connection_string=self.MONGO_URI,
                 database_name=self.database_name,
                 collection_name=self.chat_collection_name,
@@ -200,7 +189,7 @@ class Chat_DB:
 
         return str(document.inserted_id)
     
-    def input_feedback_data(self, prompt: str, response: str, conversation_id: int, user_id: str, sentiment : str):
+    def input_feedback_data(self, prompt: str, response: str, conversation_id: int, user_id: int, sentiment : str):
 
         document = self.feedback_collection.insert_one({
                 "prompt" : prompt,
@@ -235,7 +224,7 @@ class Chat_DB:
 
 
     
-    def store_poll_response(self, poll_number: int, poll_id: str, user_id: str, student_answer: str,
+    def store_poll_response(self, poll_number: int, poll_id: str, user_id: int, student_answer: str,
                         question: str, timestamp: datetime):
         document = {
             "poll_number": poll_number,
@@ -324,7 +313,7 @@ class Chat_DB:
             raise RuntimeError("Failed to export users collection.") from e
         
 
-    def store_ils_answer(self, user_id: str, question_index: int, answer: str):
+    def store_ils_answer(self, user_id: int, question_index: int, answer: str):
         doc = {
             "user_id": user_id,
             "question_index": question_index,
@@ -337,22 +326,25 @@ class Chat_DB:
             upsert=True
         )
 
-    def get_ils_answers(self, user_id: str):
+    def get_ils_answers(self, user_id: int):
         cursor = self.db["ils_answers"].find({"user_id": user_id}).sort("question_index", 1)
         return [doc["answer"] for doc in cursor]
 
-    def clear_ils_answers(self, user_id: str):
+    def clear_ils_answers(self, user_id: int):
         self.db["ils_answers"].delete_many({"user_id": user_id})
 
-    def authenticate_user(self, user_id: str):
-
-        new_user = {
-                "user_id": user_id,
-                "is_authenticated": True,
-                "is_admin": False,   # New users are not admins by default.
-                "joined_date": datetime.now()
-            }
-        self.users_collection.insert_one(new_user)
+    def authenticate_user(self, user_id: int):
+        self.users_collection.update_one(
+            {"user_id": user_id},  # Search for existing user
+            {
+                "$set": {
+                    "is_authenticated": True,
+                    "is_admin": False,  # Ensures consistency for new users
+                    "joined_date": datetime.now()
+                }
+            },
+            upsert=True  # Insert if user does not exist
+        )
 
 
 

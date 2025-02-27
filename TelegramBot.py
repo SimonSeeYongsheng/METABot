@@ -46,26 +46,30 @@ llm = llm_module.LLM(Chat_Database=chat_db)
 docs_process = docs_processor.Docs_processor()
 scheduler = AsyncIOScheduler()
 
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB limit
 
-
-supported_file_types = ["pdf", "txt", "py", "html", "js", "css", "htm", "csv"]
+supported_file_types = [
+    "pdf", "docx", "json", "html", "htm", "xml", "xlsx", "xls", "ipynb", "pptx",
+    "txt", "py", "js", "css", "csv",
+    "java", "c", "cpp", "cs", "rb", "php", "swift", "ts", "go", "rs", "sh"
+]
 
 start_message = (
     "👋 *Welcome to METABot!*\n\n"
     "I’m here to make your learning journey awesome! Here’s what you can do:\n\n"
     "📜 */start*: Learn more about how to use me—your friendly METABot!\n\n"
     "🆕 */new*: Start a fresh conversation and pick a category to dive in!\n\n"
-    "📊 */analyse*: Students, get personalized insights on your learning behaviour!\n\n"
-    "📝 */uncover*: Students, uncover any misconceptions about the course content.\n\n"
-    # "📁 */export_chat*: Save the chat history to a file *(instructors only)*.\n\n"
-    # "📂 */export_teach*: Export *Teach* category feedback to a file *(instructors only)*.\n\n"
-    # "📂 */export_guide*: Export *Guide* category feedback to a file *(instructors only)*.\n\n"
+    "📊 */analyse*: Gain personalized insights on your learning behaviour!\n\n"
+    "📝 */uncover*: Identify any misconceptions to strengthen your knowledge.\n\n"
     "✨ Ready to get started? Press /new and select a category to begin your journey. Let’s go! 🚀\n"
 )
 
 
 unsupported_file_message = (
-    "🚫 *Unsupported File Type* 🚫"
+    "🚫 *Unsupported File Type* 🚫\n\n"
+    "This file type is not supported. Please upload a document, text file, or code file in a common format.\n\n"
+    "✔ *Supported*: PDFs, Word, Excel, PowerPoint, JSON, HTML, TXT, CSV, Jupyter Notebooks, and popular programming files (Python, Java, C, JS, etc.)\n\n"
+    "Try again with a supported format. 😊"
 )
 
 ILS_QUESTIONS = [
@@ -132,6 +136,7 @@ async def set_command_menu(bot):
     commands = [
         BotCommand("start", "Open the information menu"),
         BotCommand("new", "Start a new conversation"),
+        BotCommand("clear", "Clear uploaded documents"),
         BotCommand("analyse", "Analyse learning behaviour"),
         BotCommand("uncover", "Uncover any misconceptions during the conversation"),
     ]
@@ -190,12 +195,23 @@ async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error starting a new conversation for user_id {user_id}: {start_error}")
         await context.bot.send_message(chat_id=user_id, text="An error occurred while starting a new conversation. Please try again later.")
 
+async def clear_documents(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    # Reset the documents list if it exists
+    if 'documents' in context.user_data:
+        context.user_data['documents'] = []
+        logging.info(f"Cleared processed documents for user {user_id}.")
+    else:
+        logging.info(f"No documents to clear for user {user_id}.")
+    
+    await context.bot.send_message(chat_id=user_id, text="All processed documents have been cleared.")
+
 # Handler for /analyse command to analyse learning behaviour
 async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
 
-    user_message = user_id if len(context.args) == 0 else context.args[0].upper()
+    user_message = user_id if len(context.args) == 0 else context.args[0]
 
     if chat_db.is_admin(user_id=user_id) and chat_db.user_exist(user_id=user_id):
 
@@ -321,7 +337,7 @@ async def misconception(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         logging.info(f"Misconception: {user_message}")
 
-        await context.bot.send_message(chat_id=user_id, text="Generating misconception report...give me a moment...")
+        await context.bot.send_message(chat_id=user_id, text="Uncovering misconceptions...give me a moment...")
 
         try:
             response = await llm.misconception_message(user_id=user_message)
@@ -338,7 +354,7 @@ async def misconception(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         logging.info(f"Misconception: {user_message}")
 
-        await context.bot.send_message(chat_id=user_id, text="Generating misconception report...give me a moment...")
+        await context.bot.send_message(chat_id=user_id, text="Uncovering misconceptions...give me a moment...")
 
         try:
             response = await llm.misconception_message(user_id=user_message)
@@ -443,76 +459,105 @@ async def export_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Handler to capture the user's attachments
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     user_id = update.effective_chat.id
-    # Initialize a list in context.user_data to store file metadata
+    # Ensure a documents list exists in user_data
     if 'documents' not in context.user_data:
         context.user_data['documents'] = []
 
     if update.message.document:
-
         document = update.message.document
-
         file_name = document.file_name
         file_size = document.file_size
 
-        # Log the received document details
         logging.info(f"Document received: {file_name}, size: {file_size} bytes")
 
-        # Download the document
+        # 1. Check file size (20MB limit)
+        if file_size > MAX_FILE_SIZE:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="The file size exceeds the Telegram API limit of 20MB."
+            )
+            return
+
+        # 2. Download the document using download_to_drive (saves file to disk)
         try:
             file = await update.message.effective_attachment.get_file()
             file_path = await file.download_to_drive(custom_path=os.path.join(FILE_DRIVE, file_name))
-            logging.info(f"File downloaded: {file_path}")
+            logging.info(f"File downloaded to: {file_path}")
         except Exception as e:
             logging.error(f"Error downloading file: {e}")
-            await context.bot.send_message(chat_id=user_id, text="Failed to download the document. Please try again.")
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="Failed to download the document. Please try again."
+            )
             return
 
-        # Extract file type
+        # 3. Determine file type from its extension
         try:
             _, file_extension = os.path.splitext(file_path)
-            file_type = file_extension.lstrip(".").lower()
-        
+            file_type = file_extension.lstrip('.').lower()
         except Exception as e:
             logging.error(f"Error extracting file type: {e}")
-            await context.bot.send_message(chat_id=user_id, text="Failed to determine the file type. Please check the file and try again.")
-            return
-                
-        # Check if file type is supported
-        if file_type not in supported_file_types:
-            await context.bot.send_message(chat_id=user_id, text=unsupported_file_message, parse_mode="Markdown")
-
-        # Process the document
-        else:
-
-            try:
-                text = docs_process.load_document(file_path=file_path, file_type=file_type)
-                logging.info(f"{file_name}: {text}")
-                context.user_data['documents'].append(f'{file_name}:\n{text}\n\n')
-                await context.bot.send_message(chat_id=user_id, text=f"Document successfully processed: {file_name}")
-            except Exception as e:
-                logging.error(f"Error processing document: {e}")
-                await context.bot.send_message(chat_id=user_id, text="Failed to process the document. Please try again later.")
-
-        # Ensure file is removed even if an error occurs
-        if os.path.exists(file_path):
-            try:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="Failed to determine the file type. Please check the file and try again."
+            )
+            if os.path.exists(file_path):
                 os.remove(file_path)
-                logging.info(f"Removed file: {file_path}")
-            except Exception as e:
-                logging.error(f"Error removing file: {file_path}. {e}")
+            return
 
-        if update.message.photo or update.message.audio or update.message.video:
-            await context.bot.send_message(chat_id=user_id, text=unsupported_file_message, parse_mode="Markdown")
+        # 4. Check if file type is supported; if not, inform user and remove file
+        if file_type not in supported_file_types:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=unsupported_file_message,
+                parse_mode="Markdown"
+            )
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    logging.info(f"Removed unsupported file: {file_path}")
+                except Exception as e:
+                    logging.error(f"Error removing file: {file_path}. {e}")
+            return
+
+        # 5. Process the document
+        try:
+            text = docs_process.load_document(file_path=file_path, file_type=file_type)
+            logging.info(f"Processed {file_name}: {text}")
+            context.user_data['documents'].append(f'{file_name}:\n{text}\n\n')
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=f"Document successfully processed: {file_name}"
+            )
+        except Exception as e:
+            logging.error(f"Error processing document: {e}")
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="Failed to process the document. Please try again later."
+            )
+        finally:
+            # 6. Remove the file from disk
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    logging.info(f"Removed file: {file_path}")
+                except Exception as e:
+                    logging.error(f"Error removing file: {file_path}. {e}")
+
+    # Fallback: if a non-document (like a photo/audio/video) is sent
+    elif update.message.photo or update.message.audio or update.message.video:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=unsupported_file_message,
+            parse_mode="Markdown"
+        )
 
 # Handler to handle user's messages
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_chat.id
-
-
-            
+      
     user_message = update.message.text
     logging.info(f"from user {user_id}: {user_message}")
 
@@ -605,7 +650,7 @@ POLL_UPLOAD = 1
 async def start_poll_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
     if not chat_db.is_admin(user_id=user_id):
-        await context.bot.send_message(chat_id=user_id, text="Unauthorized: Only teachers can upload poll questions.")
+        await context.bot.send_message(chat_id=user_id, text="Unauthorized access. This command is for admins only.")
         return ConversationHandler.END
     await context.bot.send_message(
         chat_id=user_id,
@@ -893,6 +938,7 @@ async def finalize_ils(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=user_id, text=final_message, parse_mode="Markdown")
 
     # Clean up ILS-related state
+    chat_db.clear_ils_answers(user_id)
     context.user_data.pop("ils_index", None)
     context.user_data.pop("poll_map", None)
 
@@ -1038,6 +1084,7 @@ async def main():
     export_users_handler = CommandHandler("export_users", export_users)
     announce_handler = CommandHandler("announce", announce)
     analyse_all_handler = CommandHandler("analyse_all", analyse_all)
+    clear_docs_handler = CommandHandler('clear', clear_documents)
 
     poll_upload_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('upload_poll', start_poll_upload)],
@@ -1069,6 +1116,7 @@ async def main():
     application.add_error_handler(error_handler)
     application.add_handler(announce_handler)
     application.add_handler(analyse_all_handler)
+    application.add_handler(clear_docs_handler)
 
     # Set menu commands
     await set_command_menu(application.bot)
