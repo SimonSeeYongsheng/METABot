@@ -59,6 +59,7 @@ start_message = (
     "I’m here to make your learning journey awesome! Here’s what you can do:\n\n"
     "📜 */start*: Learn more about how to use me—your friendly METABot!\n\n"
     "🆕 */new*: Start a fresh conversation and pick a category to dive in!\n\n"
+    "🗑 */clear*: Remove all uploaded documents.\n\n"
     "📊 */analyse*: Gain personalized insights on your learning behaviour!\n\n"
     "📝 */uncover*: Identify any misconceptions to strengthen your knowledge.\n\n"
     "✨ Ready to get started? Press /new and select a category to begin your journey. Let’s go! 🚀\n"
@@ -139,6 +140,7 @@ async def set_command_menu(bot):
         BotCommand("clear", "Clear uploaded documents"),
         BotCommand("analyse", "Analyse learning behaviour"),
         BotCommand("uncover", "Uncover any misconceptions during the conversation"),
+        BotCommand("clear", "Clear uploaded documents")
     ]
 
     await bot.set_my_commands(commands)
@@ -808,6 +810,9 @@ async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
             timestamp=datetime.now()
         )
         logging.info(f"Stored normal poll response from user {user_id} for poll {poll_id}: answer={student_answer}")
+
+        # Remove the poll details now that the response is stored
+        chat_db.remove_poll_details(poll_id)
 
 
 

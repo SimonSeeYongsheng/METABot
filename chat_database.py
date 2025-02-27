@@ -346,6 +346,10 @@ class Chat_DB:
             upsert=True  # Insert if user does not exist
         )
 
+    def remove_poll_details(self, poll_id: str):
+        self.poll_details_collection.delete_one({"poll_id": poll_id})
+
+
 
 
 
