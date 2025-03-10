@@ -122,14 +122,13 @@ ILS_QUESTIONS = [
 
 def get_next_run_time():
     now = datetime.now()
+    # Calculate the date for the next day
+    next_day = now + timedelta(days=1)
     # Select a random hour between 8 (8 AM) and 21 (9 PM)
     hour = randint(8, 21)
     minute = randint(0, 59)
     second = randint(0, 59)
-    next_run = now.replace(hour=hour, minute=minute, second=second, microsecond=0)
-    # If the random time has already passed today, schedule for tomorrow
-    if next_run <= now:
-        next_run += timedelta(days=1)
+    next_run = next_day.replace(hour=hour, minute=minute, second=second, microsecond=0)
     return next_run
 
 # Set command menu
