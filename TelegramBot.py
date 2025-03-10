@@ -1082,8 +1082,6 @@ async def shutdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Shutting down...")
     # Stop any background jobs, e.g., the scheduler
     scheduler.shutdown()
-    # Stop the bot gracefully
-    await context.application.stop()
     # Terminate the script
     sys.exit(0)
 
