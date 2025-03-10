@@ -30,6 +30,7 @@ import re
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from random import randint
 from datetime import datetime, timedelta
+import sys
 
 load_dotenv() # Load environment variables from .env file
 
@@ -1071,6 +1072,22 @@ async def analyse_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await context.bot.send_message(chat_id=admin_id, text=f"User {uid}: Analysis failed with error: {e}")
 
+async def shutdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    # Check if the user is an admin (replace with your admin check)
+    if not chat_db.is_admin(user_id):
+        await update.message.reply_text("Unauthorized access.")
+        return
+    
+    await update.message.reply_text("Shutting down...")
+    # Stop any background jobs, e.g., the scheduler
+    scheduler.shutdown()
+    # Stop the bot gracefully
+    await context.application.stop()
+    # Terminate the script
+    sys.exit(0)
+
+
 async def main():
 
     # Build the bot application
@@ -1089,6 +1106,7 @@ async def main():
     announce_handler = CommandHandler("announce", announce)
     analyse_all_handler = CommandHandler("analyse_all", analyse_all)
     clear_docs_handler = CommandHandler('clear', clear_documents)
+    shutdown_handler = CommandHandler("shutdown", shutdown)
 
     poll_upload_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('upload_poll', start_poll_upload)],
@@ -1121,6 +1139,7 @@ async def main():
     application.add_handler(announce_handler)
     application.add_handler(analyse_all_handler)
     application.add_handler(clear_docs_handler)
+    application.add_handler(shutdown_handler)
 
     # Set menu commands
     await set_command_menu(application.bot)
