@@ -24,7 +24,7 @@ METABot is a Generative AI-powered chatbot designed to support tertiary educatio
 
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/SimonSeeYongsheng/METABot
+git clone https://github.com/SimonSeeYongsheng/METABot.git
 cd METABot
 ```
 ### 2. Install dependencies
