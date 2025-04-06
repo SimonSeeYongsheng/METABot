@@ -15,7 +15,7 @@ METABot is a Generative AI-powered chatbot designed to support tertiary educatio
 - 🔍 **Learning Style Analysis** — Analyzes chat patterns to infer student learning preferences
 - ❌ **Misconception Reports** — Detects and explains conceptual misunderstandings
 - 📚 **Document-based Q&A** — Retrieves relevant info from user-uploaded materials
-- - 🗓️ **Daily Interaction Prompts** — Automatically sends questions to keep users engaged and support consistent learning
+- 🗓️ **Daily Interaction Prompts** — Automatically sends questions to keep users engaged and support consistent learning
 - 🧪 **Telegram Bot Integration** — Hosted on a public bot for experimentation
 
 ---
